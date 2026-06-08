@@ -3,6 +3,7 @@ import { getConfig, setConfig, saveImage } from '../db'
 import { buildAuthURL, exchangeCode, fetchBoards, fetchPinsFromBoard, getBestImageUrl, blobToBase64 } from '../pinterest'
 
 const CLIENT_ID = import.meta.env.VITE_PINTEREST_CLIENT_ID
+const PRESET_TOKEN = import.meta.env.VITE_PINTEREST_ACCESS_TOKEN
 
 export default function PinterestSync({ onClose, projects, activeProject }) {
   const [token, setToken] = useState('')
@@ -36,6 +37,13 @@ export default function PinterestSync({ onClose, projects, activeProject }) {
         alert('Pinterest login failed: ' + e.message)
         setStep('connect')
       }
+      return
+    }
+
+    // Use preset token from env (while Pinterest Trial is pending)
+    if (PRESET_TOKEN) {
+      setToken(PRESET_TOKEN)
+      await loadBoards(PRESET_TOKEN)
       return
     }
 
