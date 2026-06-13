@@ -1,17 +1,21 @@
 import { openDB } from 'idb'
 
-const DB_NAME = 'refbook'
-const DB_VERSION = 1
+const DB_NAME = 'refnest'
+const DB_VERSION = 2
+const ROOT = '__root__'
+
+export function toParentId(id) { return id ?? ROOT }
 
 export async function getDB() {
   return openDB(DB_NAME, DB_VERSION, {
     upgrade(db) {
-      if (!db.objectStoreNames.contains('projects')) {
-        db.createObjectStore('projects', { keyPath: 'id' })
+      if (!db.objectStoreNames.contains('boards')) {
+        const bs = db.createObjectStore('boards', { keyPath: 'id' })
+        bs.createIndex('parentId', 'parentId')
       }
-      if (!db.objectStoreNames.contains('images')) {
-        const store = db.createObjectStore('images', { keyPath: 'id' })
-        store.createIndex('projectId', 'projectId')
+      if (!db.objectStoreNames.contains('elements')) {
+        const es = db.createObjectStore('elements', { keyPath: 'id' })
+        es.createIndex('boardId', 'boardId')
       }
       if (!db.objectStoreNames.contains('config')) {
         db.createObjectStore('config', { keyPath: 'key' })
@@ -20,42 +24,52 @@ export async function getDB() {
   })
 }
 
-export async function getProjects() {
+// Boards — use '__root__' instead of null so Safari indexes it
+export async function getBoards(parentId = null) {
   const db = await getDB()
-  return db.getAll('projects')
+  const all = await db.getAllFromIndex('boards', 'parentId', toParentId(parentId))
+  return all
 }
 
-export async function saveProject(project) {
+export async function getBoard(id) {
   const db = await getDB()
-  await db.put('projects', project)
+  return db.get('boards', id)
 }
 
-export async function deleteProject(id) {
+export async function saveBoard(board) {
   const db = await getDB()
-  const images = await db.getAllFromIndex('images', 'projectId', id)
-  const tx = db.transaction(['projects', 'images'], 'readwrite')
-  await tx.objectStore('projects').delete(id)
-  for (const img of images) {
-    await tx.objectStore('images').delete(img.id)
-  }
+  // normalize parentId before saving
+  await db.put('boards', { ...board, parentId: toParentId(board.parentId) })
+}
+
+export async function deleteBoard(id) {
+  const db = await getDB()
+  const children = await getBoards(id)
+  for (const child of children) await deleteBoard(child.id)
+  const elements = await getElements(id)
+  const tx = db.transaction(['boards', 'elements'], 'readwrite')
+  for (const el of elements) await tx.objectStore('elements').delete(el.id)
+  await tx.objectStore('boards').delete(id)
   await tx.done
 }
 
-export async function getImages(projectId) {
+// Elements
+export async function getElements(boardId) {
   const db = await getDB()
-  return db.getAllFromIndex('images', 'projectId', projectId)
+  return db.getAllFromIndex('elements', 'boardId', boardId)
 }
 
-export async function saveImage(image) {
+export async function saveElement(el) {
   const db = await getDB()
-  await db.put('images', image)
+  await db.put('elements', el)
 }
 
-export async function deleteImage(id) {
+export async function deleteElement(id) {
   const db = await getDB()
-  await db.delete('images', id)
+  await db.delete('elements', id)
 }
 
+// Config
 export async function getConfig(key) {
   const db = await getDB()
   const row = await db.get('config', key)

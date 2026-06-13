@@ -1,3 +1,4 @@
+import { uid } from './utils.js'
 const PINTEREST_AUTH_URL = 'https://www.pinterest.com/oauth/'
 const PINTEREST_API = 'https://api.pinterest.com/v5'
 const SCOPES = 'boards:read,pins:read,user_accounts:read'
@@ -7,7 +8,7 @@ export function getRedirectUri() {
 }
 
 export function buildAuthURL(clientId) {
-  const state = crypto.randomUUID()
+  const state = uid()
   sessionStorage.setItem('pinterest_state', state)
   const params = new URLSearchParams({
     client_id: clientId,
