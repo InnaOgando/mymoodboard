@@ -227,6 +227,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
         {/* Child board icons */}
         {childBoards.map(b => (
           <DraggableCard key={b.id} x={b.x} y={b.y} scaleRef={scaleRef}
+            alwaysDraggable
             onMove={(x, y) => moveChildBoard(b.id, x, y)}
             onTap={() => onOpenBoard(b.id)}
           >
@@ -369,6 +370,7 @@ function ImageCard({ el, selected, onDelete, onResize, onMakeColumn, scaleRef })
       onPointerUp={cancelLong}
       onPointerCancel={cancelLong}
     >
+      <img src={el.content.src} alt="" draggable={false} style={{ width: '100%', height: 'auto', display: 'block' }} />
       {selected && (
         <div className="image-action-bar">
           <button className="img-action-btn" onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onMakeColumn?.() }}>+ Column</button>
@@ -383,7 +385,6 @@ function ImageCard({ el, selected, onDelete, onResize, onMakeColumn, scaleRef })
           <button className="img-copy-btn img-copy-close" onClick={e => { e.stopPropagation(); setShowCopyMenu(false) }}>✕</button>
         </div>
       )}
-      <img src={el.content.src} alt="" draggable={false} style={{ width: '100%', height: 'auto', display: 'block' }} />
       {selected && <ResizeHandle w={w} h={null} onResize={(nw) => onResize(nw, null)} minW={80} scaleRef={scaleRef} />}
     </div>
   )
@@ -412,43 +413,37 @@ function rgbToHsl(r, g, b) {
   return { h: Math.round(h * 360), s: Math.round(s * 100), l: Math.round(l * 100) }
 }
 
-function ColorCard({ el, selected, editing, onUpdate, onDelete }) {
-  const pickerRef = useRef()
+function ColorCard({ el, selected, onUpdate, onDelete }) {
   const color = el.content.color || '#e8315a'
   const { r, g, b } = hexToRgb(color)
   const { h, s, l } = rgbToHsl(r, g, b)
   const isDark = l < 50
   const textColor = isDark ? '#fff' : '#111'
 
-  useEffect(() => {
-    if (editing && pickerRef.current) {
-      setTimeout(() => pickerRef.current?.click(), 50)
-    }
-  }, [editing])
-
   return (
     <div
       className={`el-card el-color-card ${selected ? 'selected' : ''}`}
       style={{ background: color }}
-      onPointerDown={e => e.stopPropagation()}
     >
-      <div className="drag-handle" style={{ background: 'rgba(0,0,0,0.1)' }}>
+      <div className="drag-handle" style={{ background: 'rgba(0,0,0,0.12)' }}>
         <span className="handle-dots" style={{ color: textColor, opacity: 0.6 }}>⠿</span>
-        <span className="color-card-hint" style={{ color: textColor }}>double tap to pick</span>
-        {selected && <button className="handle-delete" onClick={e => { e.stopPropagation(); onDelete() }}>×</button>}
+        {selected && <button className="handle-delete" onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onDelete() }}>×</button>}
       </div>
+      {/* Full-width native color input — tap opens system color picker on iOS */}
+      <label className="color-card-swatch-label" onPointerDown={e => e.stopPropagation()}>
+        <input
+          type="color"
+          value={color}
+          className="color-card-input-native"
+          onChange={e => onUpdate({ ...el.content, color: e.target.value })}
+        />
+        <span className="color-card-tap-hint" style={{ color: textColor }}>tap to pick color</span>
+      </label>
       <div className="color-card-codes" style={{ color: textColor }}>
         <div className="color-code-row"><span className="color-code-label">HEX</span><span className="color-code-val">{color.toUpperCase()}</span></div>
         <div className="color-code-row"><span className="color-code-label">RGB</span><span className="color-code-val">{r}, {g}, {b}</span></div>
         <div className="color-code-row"><span className="color-code-label">HSL</span><span className="color-code-val">{h}°, {s}%, {l}%</span></div>
       </div>
-      <input
-        ref={pickerRef}
-        type="color"
-        value={color}
-        style={{ position: 'absolute', opacity: 0, width: 1, height: 1, bottom: 0, left: 0, pointerEvents: 'none' }}
-        onChange={e => onUpdate({ ...el.content, color: e.target.value })}
-      />
     </div>
   )
 }
