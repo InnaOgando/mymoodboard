@@ -15,12 +15,19 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
   const [editingId, setEditingId] = useState(null)
   const [showImagePicker, setShowImagePicker] = useState(false)
   const [pendingPos, setPendingPos] = useState({ x: 100, y: 100 })
-  const [columnTarget, setColumnTarget] = useState(null) // id of column to add image to
+  const [columnTarget, setColumnTarget] = useState(null)
   const [dropOverColumnId, setDropOverColumnId] = useState(null)
+  const [undoStack, setUndoStack] = useState([])   // [{el}, ...]
+  const [undoVisible, setUndoVisible] = useState(false)
+  const undoTimer = useRef(null)
+  const elementsRef = useRef([])  // always-current elements for async callbacks
   const scaleRef = useRef(1)
   const fileRef = useRef()
   const docRef = useRef()
   const columnFileRef = useRef()
+
+  // Keep elementsRef in sync so drag callbacks always see fresh elements
+  useEffect(() => { elementsRef.current = elements }, [elements])
 
   useEffect(() => { load() }, [boardId])
 
@@ -86,8 +93,24 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
   }
 
   async function removeElement(id) {
+    const el = elementsRef.current.find(e => e.id === id)
     await deleteElement(id)
-    setElements(prev => prev.filter(el => el.id !== id))
+    setElements(prev => prev.filter(e => e.id !== id))
+    if (el) {
+      setUndoStack(prev => [...prev.slice(-19), el])
+      setUndoVisible(true)
+      clearTimeout(undoTimer.current)
+      undoTimer.current = setTimeout(() => setUndoVisible(false), 5000)
+    }
+  }
+
+  async function undo() {
+    const el = undoStack[undoStack.length - 1]
+    if (!el) return
+    await saveElement(el)
+    setElements(prev => [...prev, el])
+    setUndoStack(prev => prev.slice(0, -1))
+    if (undoStack.length <= 1) setUndoVisible(false)
   }
 
   async function resizeElement(id, w, h) {
@@ -140,14 +163,14 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
     setElements(prev => prev.map(e => e.id === colId ? updated : e))
   }
 
-  // Returns the column id that the point (cx, cy) in canvas space falls inside, or null
   function hitTestColumn(cx, cy) {
-    const cols = elements.filter(e => e.type === 'column')
+    // Use elementsRef so this always sees the latest elements (no stale closure)
+    const cols = elementsRef.current.filter(e => e.type === 'column')
     for (const col of cols) {
-      const colW = col.w || 220
+      const colW = (col.w || 220) + 40  // +40px generous margin
       const numImages = (col.content.images || []).length
-      const colH = numImages * 185 + 40 // rough estimate per image
-      if (cx >= col.x && cx <= col.x + colW && cy >= col.y && cy <= col.y + colH) {
+      const colH = numImages * 220 + 80 // generous estimate
+      if (cx >= col.x - 20 && cx <= col.x + colW && cy >= col.y - 20 && cy <= col.y + colH) {
         return col.id
       }
     }
@@ -156,18 +179,17 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
 
   function handleImageDragMove(imageEl, nx, ny) {
     const cx = nx + (imageEl.w || 200) / 2
-    const cy = ny + 60
-    const hit = hitTestColumn(cx, cy)
-    setDropOverColumnId(hit)
+    const cy = ny + 80
+    setDropOverColumnId(hitTestColumn(cx, cy))
   }
 
   async function handleImageDragEnd(imageEl, nx, ny) {
     setDropOverColumnId(null)
     const cx = nx + (imageEl.w || 200) / 2
-    const cy = ny + 60
+    const cy = ny + 80
     const colId = hitTestColumn(cx, cy)
     if (!colId) return
-    const col = elements.find(e => e.id === colId)
+    const col = elementsRef.current.find(e => e.id === colId)
     if (!col) return
     try {
       await deleteElement(imageEl.id)
@@ -349,6 +371,14 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
           onClose={() => setShowImagePicker(false)}
           boardId={boardId}
         />
+      )}
+
+      {undoVisible && (
+        <div className="undo-toast">
+          <span>Item apagado</span>
+          <button className="undo-btn" onClick={undo}>Desfazer</button>
+          <button className="undo-close" onClick={() => setUndoVisible(false)}>×</button>
+        </div>
       )}
     </div>
   )
