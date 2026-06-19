@@ -745,6 +745,12 @@ body {
 .img-copy-btn:hover { background: rgba(255,255,255,0.25); }
 .img-copy-close { padding: 4px 8px; }
 
+/* Drop target highlight */
+.el-card.drop-target {
+  outline: 2.5px dashed var(--accent);
+  box-shadow: 0 0 0 4px rgba(232,49,90,0.15);
+}
+
 /* ── Column card ── */
 .el-column {
   background: var(--surface);

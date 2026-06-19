@@ -16,6 +16,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
   const [showImagePicker, setShowImagePicker] = useState(false)
   const [pendingPos, setPendingPos] = useState({ x: 100, y: 100 })
   const [columnTarget, setColumnTarget] = useState(null) // id of column to add image to
+  const [dropOverColumnId, setDropOverColumnId] = useState(null)
   const scaleRef = useRef(1)
   const fileRef = useRef()
   const docRef = useRef()
@@ -139,6 +140,47 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
     setElements(prev => prev.map(e => e.id === colId ? updated : e))
   }
 
+  // Returns the column id that the point (cx, cy) in canvas space falls inside, or null
+  function hitTestColumn(cx, cy) {
+    const cols = elements.filter(e => e.type === 'column')
+    for (const col of cols) {
+      const colW = col.w || 220
+      const numImages = (col.content.images || []).length
+      const colH = numImages * 185 + 40 // rough estimate per image
+      if (cx >= col.x && cx <= col.x + colW && cy >= col.y && cy <= col.y + colH) {
+        return col.id
+      }
+    }
+    return null
+  }
+
+  function handleImageDragMove(imageEl, nx, ny) {
+    const cx = nx + (imageEl.w || 200) / 2
+    const cy = ny + 60
+    const hit = hitTestColumn(cx, cy)
+    setDropOverColumnId(hit)
+  }
+
+  async function handleImageDragEnd(imageEl, nx, ny) {
+    setDropOverColumnId(null)
+    const cx = nx + (imageEl.w || 200) / 2
+    const cy = ny + 60
+    const colId = hitTestColumn(cx, cy)
+    if (!colId) return
+    const col = elements.find(e => e.id === colId)
+    if (!col) return
+    try {
+      await deleteElement(imageEl.id)
+      const updated = {
+        ...col,
+        content: { ...col.content, images: [...(col.content.images || []), { id: uid(), src: imageEl.content.src }] }
+      }
+      await saveElement(updated)
+      setElements(prev => prev.filter(e => e.id !== imageEl.id).map(e => e.id === colId ? updated : e))
+      setSelectedId(colId)
+    } catch (err) { console.error('drop into column failed', err) }
+  }
+
   async function removeChildBoard(id) {
     if (!confirm('Delete this board and everything in it?')) return
     await deleteBoard(id)
@@ -249,6 +291,8 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
           <DraggableCard key={el.id} x={el.x} y={el.y} scaleRef={scaleRef}
             selected={selectedId === el.id}
             onMove={(x, y) => moveElement(el.id, x, y)}
+            onDragMove={el.type === 'image' ? (nx, ny) => handleImageDragMove(el, nx, ny) : undefined}
+            onDragEnd={el.type === 'image' ? (nx, ny) => handleImageDragEnd(el, nx, ny) : undefined}
             onTap={() => {
               if (selectedId === el.id) {
                 if (el.type === 'link' && el.content.url) {
@@ -275,6 +319,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
               onMakeColumn={() => makeColumn(el)}
               onAddColumnImage={() => { setColumnTarget(el.id); columnFileRef.current.click() }}
               onRemoveColumnImage={imgId => removeImageFromColumn(el.id, imgId)}
+              isDropTarget={dropOverColumnId === el.id}
               scaleRef={scaleRef}
             />
           </DraggableCard>
@@ -309,8 +354,8 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
   )
 }
 
-function ElementCard({ el, selected, editing, onUpdate, onDelete, onStopEdit, onEdit, onResize, onColor, onMakeColumn, onAddColumnImage, onRemoveColumnImage, scaleRef }) {
-  const props = { el, selected, editing, onUpdate, onDelete, onStopEdit, onEdit, onResize, onColor, onMakeColumn, onAddColumnImage, onRemoveColumnImage, scaleRef }
+function ElementCard({ el, selected, editing, onUpdate, onDelete, onStopEdit, onEdit, onResize, onColor, onMakeColumn, onAddColumnImage, onRemoveColumnImage, isDropTarget, scaleRef }) {
+  const props = { el, selected, editing, onUpdate, onDelete, onStopEdit, onEdit, onResize, onColor, onMakeColumn, onAddColumnImage, onRemoveColumnImage, isDropTarget, scaleRef }
   switch (el.type) {
     case 'image': return <ImageCard {...props} />
     case 'note': return <TextCard {...props} />
@@ -450,12 +495,12 @@ function ColorCard({ el, selected, onUpdate, onDelete }) {
   )
 }
 
-function ColumnCard({ el, selected, onDelete, onResize, onAddColumnImage, onRemoveColumnImage, scaleRef }) {
+function ColumnCard({ el, selected, isDropTarget, onDelete, onResize, onAddColumnImage, onRemoveColumnImage, scaleRef }) {
   const w = el.w || 220
   const images = el.content.images || []
 
   return (
-    <div className={`el-card el-column ${selected ? 'selected' : ''}`} style={{ width: w }}>
+    <div className={`el-card el-column ${selected ? 'selected' : ''} ${isDropTarget ? 'drop-target' : ''}`} style={{ width: w }}>
       <div className="drag-handle">
         <span className="handle-dots">⠿</span>
         <span className="column-label">Column</span>

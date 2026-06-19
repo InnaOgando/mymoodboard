@@ -2,10 +2,11 @@ import { useRef } from 'react'
 
 const INTERACTIVE = new Set(['INPUT', 'TEXTAREA', 'SELECT', 'A'])
 
-export default function DraggableCard({ x, y, scaleRef, onMove, onTap, children, selected, alwaysDraggable }) {
+export default function DraggableCard({ x, y, scaleRef, onMove, onTap, onDragMove, onDragEnd, children, selected, alwaysDraggable }) {
   const isDragging = useRef(false)
   const startPointer = useRef({ x: 0, y: 0 })
   const startPos = useRef({ x: 0, y: 0 })
+  const lastPos = useRef({ x, y })
   const moved = useRef(false)
   const ref = useRef()
   const longTimer = useRef(null)
@@ -62,12 +63,22 @@ export default function DraggableCard({ x, y, scaleRef, onMove, onTap, children,
     const ndx = dx / s
     const ndy = dy / s
     if (Math.abs(ndx) > 4 || Math.abs(ndy) > 4) moved.current = true
-    if (moved.current) onMove?.(startPos.current.x + ndx, startPos.current.y + ndy)
+    if (moved.current) {
+      const nx = startPos.current.x + ndx
+      const ny = startPos.current.y + ndy
+      lastPos.current = { x: nx, y: ny }
+      onMove?.(nx, ny)
+      onDragMove?.(nx, ny)
+    }
   }
 
   function onPointerUp() {
     cancelLong()
-    if (!moved.current) onTap?.()
+    if (moved.current) {
+      onDragEnd?.(lastPos.current.x, lastPos.current.y)
+    } else {
+      onTap?.()
+    }
     isDragging.current = false
   }
 
