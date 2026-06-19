@@ -102,6 +102,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
   }
 
   async function makeColumn(imageEl) {
+    try {
     // Remove original image element and create a column with it
     await deleteElement(imageEl.id)
     const col = {
@@ -117,6 +118,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
     await saveElement(col)
     setElements(prev => [...prev.filter(e => e.id !== imageEl.id), col])
     setSelectedId(col.id)
+    } catch(err) { console.error('makeColumn failed', err) }
   }
 
   async function addImageToColumn(colId, src) {
@@ -378,7 +380,7 @@ function ImageCard({ el, selected, onDelete, onResize, onMakeColumn, scaleRef })
           <button className="img-action-btn img-action-delete" onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onDelete() }}>×</button>
         </div>
       )}
-      {showCopyMenu && (
+      {selected && showCopyMenu && (
         <div className="img-copy-menu" onPointerDown={e => e.stopPropagation()}>
           <button className="img-copy-btn" onClick={copyImage}>Copy</button>
           <button className="img-copy-btn" onClick={shareImage}>Share</button>
@@ -429,16 +431,16 @@ function ColorCard({ el, selected, onUpdate, onDelete }) {
         <span className="handle-dots" style={{ color: textColor, opacity: 0.6 }}>⠿</span>
         {selected && <button className="handle-delete" onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onDelete() }}>×</button>}
       </div>
-      {/* Full-width native color input — tap opens system color picker on iOS */}
-      <label className="color-card-swatch-label" onPointerDown={e => e.stopPropagation()}>
+      {/* input[type=color] is in DraggableCard INTERACTIVE set — tap goes straight to native picker */}
+      <div className="color-card-swatch-row">
         <input
           type="color"
           value={color}
           className="color-card-input-native"
           onChange={e => onUpdate({ ...el.content, color: e.target.value })}
         />
-        <span className="color-card-tap-hint" style={{ color: textColor }}>tap to pick color</span>
-      </label>
+        <span className="color-card-tap-hint" style={{ color: textColor }}>tap circle to pick</span>
+      </div>
       <div className="color-card-codes" style={{ color: textColor }}>
         <div className="color-code-row"><span className="color-code-label">HEX</span><span className="color-code-val">{color.toUpperCase()}</span></div>
         <div className="color-code-row"><span className="color-code-label">RGB</span><span className="color-code-val">{r}, {g}, {b}</span></div>

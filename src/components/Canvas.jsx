@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from 'react'
+import { useRef, useEffect, useLayoutEffect, useState } from 'react'
 
 export default function Canvas({ children, onClick, scaleRef: externalScaleRef }) {
   const containerRef = useRef()
@@ -138,6 +138,12 @@ export default function Canvas({ children, onClick, scaleRef: externalScaleRef }
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)
   }, [])
+
+  // After every React re-render, restore the transform that was set via direct DOM
+  // (React resets inline style on re-render, which would snap the canvas back to initial position)
+  useLayoutEffect(() => {
+    applyTransform()
+  })
 
   return (
     <div

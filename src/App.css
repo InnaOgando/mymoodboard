@@ -668,15 +668,13 @@ body {
   border: none;
   box-shadow: var(--shadow);
 }
-.color-card-swatch-label {
+.color-card-swatch-row {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 8px;
   height: 44px;
-  cursor: pointer;
   background: rgba(0,0,0,0.08);
-  position: relative;
 }
 .color-card-input-native {
   width: 32px;
