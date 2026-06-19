@@ -427,17 +427,19 @@ function ImageCard({ el, selected, onDelete, onResize, onMakeColumn, scaleRef })
   }
 
   return (
-    <div className={`el-card el-image ${selected ? 'selected' : ''}`} style={{ width: w }}>
-      <img src={el.content.src} alt="" draggable={false} style={{ width: '100%', height: 'auto', display: 'block' }} />
+    <div style={{ position: 'relative', width: w }}>
       {selected && (
-        <div className="image-action-bar" onPointerDown={e => e.stopPropagation()}>
-          <button className="img-action-btn" onClick={e => { e.stopPropagation(); onMakeColumn?.() }}>+ Column</button>
-          <button className="img-action-btn" onClick={copyImage}>Copy</button>
-          <button className="img-action-btn" onClick={shareImage}>Share</button>
-          <button className="img-action-btn img-action-delete" onClick={e => { e.stopPropagation(); onDelete() }}>×</button>
+        <div className="img-popup-menu" onPointerDown={e => e.stopPropagation()}>
+          <button className="img-popup-btn" onClick={e => { e.stopPropagation(); onMakeColumn?.() }}>+ Column</button>
+          <button className="img-popup-btn" onClick={copyImage}>Copy</button>
+          <button className="img-popup-btn" onClick={shareImage}>Share</button>
+          <button className="img-popup-btn img-popup-delete" onClick={e => { e.stopPropagation(); onDelete() }}>×</button>
         </div>
       )}
-      {selected && <ResizeHandle w={w} h={null} onResize={(nw) => onResize(nw, null)} minW={80} scaleRef={scaleRef} />}
+      <div className={`el-card el-image ${selected ? 'selected' : ''}`} style={{ width: w }}>
+        <img src={el.content.src} alt="" draggable={false} style={{ width: '100%', height: 'auto', display: 'block' }} />
+        {selected && <ResizeHandle w={w} h={null} onResize={(nw) => onResize(nw, null)} minW={80} scaleRef={scaleRef} />}
+      </div>
     </div>
   )
 }

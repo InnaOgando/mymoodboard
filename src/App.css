@@ -299,34 +299,35 @@ body {
   z-index: 30;
 }
 
-/* Card delete button */
-.image-action-bar {
+/* Image popup menu — floats above the image, never clipped */
+.img-popup-menu {
   position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
-  justify-content: flex-end;
   gap: 6px;
-  z-index: 10;
-  padding: 6px 8px;
-  background: linear-gradient(to top, rgba(0,0,0,0.55), transparent);
-  border-radius: 0 0 8px 8px;
+  background: #1a1a1a;
+  border-radius: 20px;
+  padding: 7px 10px;
+  z-index: 50;
+  white-space: nowrap;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.35);
 }
-.img-action-btn {
-  background: rgba(0,0,0,0.6);
+.img-popup-btn {
+  background: rgba(255,255,255,0.12);
   color: #fff;
   border: none;
-  border-radius: 6px;
-  padding: 5px 12px;
-  font-size: 0.8rem;
+  border-radius: 12px;
+  padding: 5px 13px;
+  font-size: 0.82rem;
   cursor: pointer;
+  font-family: inherit;
 }
-.img-action-delete {
-  background: #e05555;
+.img-popup-btn:active { background: rgba(255,255,255,0.22); }
+.img-popup-delete {
+  background: #c0392b;
   font-weight: 700;
-  font-size: 1rem;
-  padding: 3px 10px;
 }
 .card-delete-btn {
   position: absolute;
