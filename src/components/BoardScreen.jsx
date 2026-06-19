@@ -261,7 +261,13 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
   }
 
   async function pasteFromClipboard() {
-    // Try clipboard API (works on HTTPS / desktop)
+    // 1. Check internal app clipboard first (set by Copy button on image cards)
+    const internal = sessionStorage.getItem('refnest_copied_image')
+    if (internal) {
+      await addElement('image', pendingPos, { src: internal })
+      return
+    }
+    // 2. Try OS clipboard API (works on HTTPS desktop/Android)
     try {
       const items = await navigator.clipboard.read()
       for (const item of items) {
@@ -274,7 +280,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
         }
       }
     } catch {}
-    // Fallback: open photo picker (iOS saves screenshots to Photos)
+    // 3. Fallback: open photo picker
     fileRef.current.click()
   }
 
@@ -401,20 +407,13 @@ function ElementCard({ el, selected, editing, onUpdate, onDelete, onStopEdit, on
 
 function ImageCard({ el, selected, onDelete, onResize, onMakeColumn, scaleRef }) {
   const w = el.w || 200
+  const [copied, setCopied] = useState(false)
 
-  async function copyImage(e) {
+  function copyImage(e) {
     e.stopPropagation()
-    try {
-      const res = await fetch(el.content.src)
-      const blob = await res.blob()
-      await navigator.clipboard.write([new ClipboardItem({ 'image/jpeg': blob })])
-    } catch {
-      try {
-        const res = await fetch(el.content.src)
-        const blob = await res.blob()
-        await navigator.share({ files: [new File([blob], 'image.jpg', { type: 'image/jpeg' })] })
-      } catch {}
-    }
+    sessionStorage.setItem('refnest_copied_image', el.content.src)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
   }
 
   async function shareImage(e) {
@@ -431,7 +430,7 @@ function ImageCard({ el, selected, onDelete, onResize, onMakeColumn, scaleRef })
       {selected && (
         <div className="img-popup-menu" onPointerDown={e => e.stopPropagation()}>
           <button className="img-popup-btn" onClick={e => { e.stopPropagation(); onMakeColumn?.() }}>+ Column</button>
-          <button className="img-popup-btn" onClick={copyImage}>Copy</button>
+          <button className="img-popup-btn" onClick={copyImage}>{copied ? '✓ Copied' : 'Copy'}</button>
           <button className="img-popup-btn" onClick={shareImage}>Share</button>
           <button className="img-popup-btn img-popup-delete" onClick={e => { e.stopPropagation(); onDelete() }}>×</button>
         </div>
