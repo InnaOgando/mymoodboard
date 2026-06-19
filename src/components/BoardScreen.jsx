@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { uid } from '../utils.js'
 import { getBoard, getBoards, saveBoard, deleteBoard, getElements, saveElement, deleteElement } from '../db'
 import Canvas from './Canvas'
@@ -15,9 +15,11 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
   const [editingId, setEditingId] = useState(null)
   const [showImagePicker, setShowImagePicker] = useState(false)
   const [pendingPos, setPendingPos] = useState({ x: 100, y: 100 })
+  const [columnTarget, setColumnTarget] = useState(null) // id of column to add image to
   const scaleRef = useRef(1)
   const fileRef = useRef()
   const docRef = useRef()
+  const columnFileRef = useRef()
 
   useEffect(() => { load() }, [boardId])
 
@@ -91,6 +93,48 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
     setElements(prev => prev.map(el => el.id === id ? { ...el, w, h } : el))
     const el = elements.find(e => e.id === id)
     if (el) await saveElement({ ...el, w, h })
+  }
+
+  async function colorElement(id, color) {
+    setElements(prev => prev.map(el => el.id === id ? { ...el, content: { ...el.content, bgColor: color } } : el))
+    const el = elements.find(e => e.id === id)
+    if (el) await saveElement({ ...el, content: { ...el.content, bgColor: color } })
+  }
+
+  async function makeColumn(imageEl) {
+    // Remove original image element and create a column with it
+    await deleteElement(imageEl.id)
+    const col = {
+      id: uid(),
+      boardId,
+      type: 'column',
+      x: imageEl.x,
+      y: imageEl.y,
+      w: imageEl.w || 200,
+      content: { images: [{ id: uid(), src: imageEl.content.src }] },
+      createdAt: Date.now()
+    }
+    await saveElement(col)
+    setElements(prev => [...prev.filter(e => e.id !== imageEl.id), col])
+    setSelectedId(col.id)
+  }
+
+  async function addImageToColumn(colId, src) {
+    const col = elements.find(e => e.id === colId)
+    if (!col) return
+    const updated = { ...col, content: { ...col.content, images: [...(col.content.images || []), { id: uid(), src }] } }
+    await saveElement(updated)
+    setElements(prev => prev.map(e => e.id === colId ? updated : e))
+  }
+
+  async function removeImageFromColumn(colId, imgId) {
+    const col = elements.find(e => e.id === colId)
+    if (!col) return
+    const images = col.content.images.filter(i => i.id !== imgId)
+    if (images.length === 0) { await removeElement(colId); return }
+    const updated = { ...col, content: { ...col.content, images } }
+    await saveElement(updated)
+    setElements(prev => prev.map(e => e.id === colId ? updated : e))
   }
 
   async function removeChildBoard(id) {
@@ -222,6 +266,10 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
               onStopEdit={() => setEditingId(null)}
               onEdit={() => setEditingId(el.id)}
               onResize={(w, h) => resizeElement(el.id, w, h)}
+              onColor={color => colorElement(el.id, color)}
+              onMakeColumn={() => makeColumn(el)}
+              onAddColumnImage={() => { setColumnTarget(el.id); columnFileRef.current.click() }}
+              onRemoveColumnImage={imgId => removeImageFromColumn(el.id, imgId)}
               scaleRef={scaleRef}
             />
           </DraggableCard>
@@ -234,6 +282,16 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
         onChange={e => handleFiles(Array.from(e.target.files))} />
       <input ref={docRef} type="file" accept=".pdf,.doc,.docx,image/*" multiple style={{ display: 'none' }}
         onChange={e => handleFiles(Array.from(e.target.files))} />
+      <input ref={columnFileRef} type="file" accept="image/*" multiple style={{ display: 'none' }}
+        onChange={async e => {
+          if (!columnTarget) return
+          for (const file of Array.from(e.target.files)) {
+            const src = await compressImage(file)
+            await addImageToColumn(columnTarget, src)
+          }
+          setColumnTarget(null)
+          e.target.value = ''
+        }} />
 
       {showImagePicker && (
         <ImagePicker
@@ -246,8 +304,8 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
   )
 }
 
-function ElementCard({ el, selected, editing, onUpdate, onDelete, onStopEdit, onEdit, onResize, scaleRef }) {
-  const props = { el, selected, editing, onUpdate, onDelete, onStopEdit, onEdit, onResize, scaleRef }
+function ElementCard({ el, selected, editing, onUpdate, onDelete, onStopEdit, onEdit, onResize, onColor, onMakeColumn, onAddColumnImage, onRemoveColumnImage, scaleRef }) {
+  const props = { el, selected, editing, onUpdate, onDelete, onStopEdit, onEdit, onResize, onColor, onMakeColumn, onAddColumnImage, onRemoveColumnImage, scaleRef }
   switch (el.type) {
     case 'image': return <ImageCard {...props} />
     case 'note': return <TextCard {...props} />
@@ -255,11 +313,12 @@ function ElementCard({ el, selected, editing, onUpdate, onDelete, onStopEdit, on
     case 'link': return <LinkCard {...props} />
     case 'todo': return <TodoCard {...props} />
     case 'document': return <DocumentCard {...props} />
+    case 'column': return <ColumnCard {...props} />
     default: return null
   }
 }
 
-function ImageCard({ el, selected, onDelete, onResize, scaleRef }) {
+function ImageCard({ el, selected, onDelete, onResize, onMakeColumn, scaleRef }) {
   const w = el.w || 200
 
   async function shareImage(e) {
@@ -276,12 +335,61 @@ function ImageCard({ el, selected, onDelete, onResize, scaleRef }) {
     <div className={`el-card el-image ${selected ? 'selected' : ''}`} style={{ width: w }}>
       {selected && (
         <div className="image-action-bar">
-          <button className="img-action-btn" onPointerDown={e => e.stopPropagation()} onClick={shareImage}>Share / Copy</button>
+          <button className="img-action-btn" onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onMakeColumn?.() }}>+ Column</button>
+          <button className="img-action-btn" onPointerDown={e => e.stopPropagation()} onClick={shareImage}>Share</button>
           <button className="img-action-btn img-action-delete" onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onDelete() }}>×</button>
         </div>
       )}
       <img src={el.content.src} alt="" draggable={false} style={{ width: '100%', height: 'auto', display: 'block' }} />
       {selected && <ResizeHandle w={w} h={null} onResize={(nw) => onResize(nw, null)} minW={80} scaleRef={scaleRef} />}
+    </div>
+  )
+}
+
+const COLOR_SWATCHES = ['#ffffff', '#fffbe6', '#e8f5e9', '#e3f2fd', '#fce4ec', '#f3e5f5', '#fff3e0', '#f5f5f5', '#1a1a1a']
+
+function ColorPicker({ current, onColor }) {
+  return (
+    <div className="color-picker-row" onPointerDown={e => e.stopPropagation()}>
+      {COLOR_SWATCHES.map(c => (
+        <button
+          key={c}
+          className={`color-swatch ${current === c ? 'active' : ''}`}
+          style={{ background: c }}
+          onClick={e => { e.stopPropagation(); onColor(c) }}
+        />
+      ))}
+    </div>
+  )
+}
+
+function ColumnCard({ el, selected, onDelete, onResize, onAddColumnImage, onRemoveColumnImage, scaleRef }) {
+  const w = el.w || 220
+  const images = el.content.images || []
+
+  return (
+    <div className={`el-card el-column ${selected ? 'selected' : ''}`} style={{ width: w }}>
+      <div className="drag-handle">
+        <span className="handle-dots">⠿</span>
+        <span className="column-label">Column</span>
+        {selected && (
+          <>
+            <button className="img-action-btn col-add-btn" onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onAddColumnImage?.() }}>+ Add</button>
+            <button className="handle-delete" onClick={e => { e.stopPropagation(); onDelete() }}>×</button>
+          </>
+        )}
+      </div>
+      <div className="column-images">
+        {images.map(img => (
+          <div key={img.id} className="column-img-wrap">
+            <img src={img.src} alt="" draggable={false} style={{ width: '100%', display: 'block' }} />
+            {selected && (
+              <button className="col-img-remove" onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onRemoveColumnImage?.(img.id) }}>×</button>
+            )}
+          </div>
+        ))}
+      </div>
+      {selected && <ResizeHandle w={w} h={null} onResize={(nw) => onResize(nw, null)} minW={100} scaleRef={scaleRef} />}
     </div>
   )
 }
@@ -309,11 +417,12 @@ function NoteCard({ el, selected, editing, onUpdate, onDelete, onStopEdit }) {
   )
 }
 
-function TextCard({ el, selected, editing, onUpdate, onDelete, onResize, scaleRef }) {
+function TextCard({ el, selected, editing, onUpdate, onDelete, onResize, onColor, scaleRef }) {
   const ref = useRef()
   const fontSize = el.content.fontSize || 20
   const w = el.w || 220
   const h = el.h || 120
+  const bg = el.content.bgColor || '#ffffff'
 
   useEffect(() => {
     if (editing && ref.current) setTimeout(() => ref.current?.focus(), 50)
@@ -322,16 +431,17 @@ function TextCard({ el, selected, editing, onUpdate, onDelete, onResize, scaleRe
   return (
     <div
       className={`el-card el-text ${selected ? 'selected' : ''} ${editing ? 'editing' : ''}`}
-      style={{ width: w, height: h }}
+      style={{ width: w, height: h, background: bg }}
     >
       <div className="drag-handle">
         <span className="handle-dots">⠿</span>
         {selected && <button className="handle-delete" onClick={e => { e.stopPropagation(); onDelete() }}>×</button>}
       </div>
+      {selected && <ColorPicker current={bg} onColor={onColor} />}
       <textarea
         ref={ref}
         className="card-textarea card-textarea-text"
-        style={{ fontSize: `${fontSize}px`, height: h - 28 }}
+        style={{ fontSize: `${fontSize}px`, height: selected ? h - 56 : h - 28, background: 'transparent' }}
         value={el.content.text || ''}
         onChange={e => onUpdate({ ...el.content, text: e.target.value })}
         placeholder="Tap to type…"
@@ -341,7 +451,7 @@ function TextCard({ el, selected, editing, onUpdate, onDelete, onResize, scaleRe
   )
 }
 
-function LinkCard({ el, selected, editing, onUpdate, onDelete, onStopEdit, onEdit, onResize, scaleRef }) {
+function LinkCard({ el, selected, editing, onUpdate, onDelete, onStopEdit, onEdit, onResize, onColor, scaleRef }) {
   const ref = useRef()
   useEffect(() => {
     if (editing && ref.current) setTimeout(() => ref.current?.focus(), 50)
@@ -355,14 +465,16 @@ function LinkCard({ el, selected, editing, onUpdate, onDelete, onStopEdit, onEdi
   }
 
   const w = el.w || 260
+  const bg = el.content.bgColor || '#ffffff'
 
   return (
-    <div className={`el-card el-link ${selected ? 'selected' : ''}`} style={{ width: w }}>
+    <div className={`el-card el-link ${selected ? 'selected' : ''}`} style={{ width: w, background: bg }}>
       <div className="drag-handle">
         <span className="handle-dots">⠿</span>
         {selected && <button className="handle-edit" onClick={e => { e.stopPropagation(); onEdit?.() }}>✎</button>}
         {selected && <button className="handle-delete" onClick={e => { e.stopPropagation(); onDelete() }}>×</button>}
       </div>
+      {selected && <ColorPicker current={bg} onColor={onColor} />}
       {editing ? (
         <div className="link-edit-col">
           <div className="link-edit-row">
@@ -398,9 +510,10 @@ function shortUrl(url) {
   } catch { return url.length > 40 ? url.slice(0, 40) + '…' : url }
 }
 
-function TodoCard({ el, selected, editing, onUpdate, onDelete, onStopEdit, onResize, scaleRef }) {
+function TodoCard({ el, selected, editing, onUpdate, onDelete, onStopEdit, onResize, onColor, scaleRef }) {
   const items = el.content.items?.length ? el.content.items : [{ text: '', done: false }]
   const w = el.w || 260
+  const bg = el.content.bgColor || '#ffffff'
 
   function toggleItem(i) {
     const updated = items.map((item, idx) => {
@@ -430,11 +543,12 @@ function TodoCard({ el, selected, editing, onUpdate, onDelete, onStopEdit, onRes
   }
 
   return (
-    <div className={`el-card el-todo ${selected ? 'selected' : ''}`} style={{ width: w }}>
+    <div className={`el-card el-todo ${selected ? 'selected' : ''}`} style={{ width: w, background: bg }}>
       <div className="drag-handle">
         <span className="handle-dots">⠿</span>
         {selected && <button className="handle-delete" onClick={e => { e.stopPropagation(); onDelete() }}>×</button>}
       </div>
+      {selected && <ColorPicker current={bg} onColor={onColor} />}
       {items.map((item, i) => {
         const text = typeof item === 'object' ? item.text : item
         const done = typeof item === 'object' ? item.done : false
