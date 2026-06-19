@@ -474,33 +474,23 @@ function rgbToHsl(r, g, b) {
 function ColorCard({ el, selected, onUpdate, onDelete }) {
   const color = el.content.color || '#e8315a'
   const { r, g, b } = hexToRgb(color)
-  const { h, s, l } = rgbToHsl(r, g, b)
-  const isDark = l < 50
+  const isDark = (r * 299 + g * 587 + b * 114) / 1000 < 128
   const textColor = isDark ? '#fff' : '#111'
 
   return (
-    <div
-      className={`el-card el-color-card ${selected ? 'selected' : ''}`}
-      style={{ background: color }}
-    >
-      <div className="drag-handle" style={{ background: 'rgba(0,0,0,0.12)' }}>
-        <span className="handle-dots" style={{ color: textColor, opacity: 0.6 }}>⠿</span>
-        {selected && <button className="handle-delete" onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onDelete() }}>×</button>}
-      </div>
-      {/* input[type=color] is in DraggableCard INTERACTIVE set — tap goes straight to native picker */}
-      <div className="color-card-swatch-row">
+    <div className={`el-card el-color-card ${selected ? 'selected' : ''}`} style={{ background: color }}>
+      <div className="color-card-row">
         <input
           type="color"
           value={color}
           className="color-card-input-native"
           onChange={e => onUpdate({ ...el.content, color: e.target.value })}
         />
-        <span className="color-card-tap-hint" style={{ color: textColor }}>tap circle to pick</span>
-      </div>
-      <div className="color-card-codes" style={{ color: textColor }}>
-        <div className="color-code-row"><span className="color-code-label">HEX</span><span className="color-code-val">{color.toUpperCase()}</span></div>
-        <div className="color-code-row"><span className="color-code-label">RGB</span><span className="color-code-val">{r}, {g}, {b}</span></div>
-        <div className="color-code-row"><span className="color-code-label">HSL</span><span className="color-code-val">{h}°, {s}%, {l}%</span></div>
+        <div className="color-card-codes" style={{ color: textColor }}>
+          <div className="color-code-row"><span className="color-code-label">HEX</span><span className="color-code-val">{color.toUpperCase()}</span></div>
+          <div className="color-code-row"><span className="color-code-label">RGB</span><span className="color-code-val">{r}, {g}, {b}</span></div>
+        </div>
+        {selected && <button className="color-card-del" onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onDelete() }}>×</button>}
       </div>
     </div>
   )

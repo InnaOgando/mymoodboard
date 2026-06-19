@@ -663,61 +663,69 @@ body {
 
 /* ── Color card ── */
 .el-color-card {
-  width: 160px;
   border-radius: 10px;
   overflow: hidden;
   border: none;
   box-shadow: var(--shadow);
+  width: fit-content;
 }
-.color-card-swatch-row {
+.color-card-row {
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 8px;
-  height: 44px;
-  background: rgba(0,0,0,0.08);
+  padding: 7px 10px;
 }
 .color-card-input-native {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border: 2px solid rgba(255,255,255,0.7);
   border-radius: 50%;
   cursor: pointer;
   padding: 0;
   background: none;
+  flex-shrink: 0;
   -webkit-appearance: none;
   appearance: none;
 }
 .color-card-input-native::-webkit-color-swatch-wrapper { padding: 0; border-radius: 50%; }
 .color-card-input-native::-webkit-color-swatch { border: none; border-radius: 50%; }
-.color-card-tap-hint {
-  font-size: 0.68rem;
-  opacity: 0.8;
-  pointer-events: none;
-}
 .color-card-codes {
-  padding: 10px 12px 12px;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 2px;
 }
 .color-code-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 0.78rem;
+  gap: 6px;
+  font-size: 0.72rem;
 }
 .color-code-label {
   font-weight: 700;
-  font-size: 0.68rem;
+  font-size: 0.62rem;
   opacity: 0.6;
-  width: 28px;
+  width: 24px;
   flex-shrink: 0;
 }
 .color-code-val {
   font-family: 'Courier New', monospace;
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   letter-spacing: 0.02em;
+}
+.color-card-del {
+  background: rgba(0,0,0,0.25);
+  border: none;
+  color: #fff;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  font-size: 0.8rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-left: 2px;
 }
 
 
