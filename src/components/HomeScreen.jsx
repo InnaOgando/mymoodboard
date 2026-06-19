@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { uid } from '../utils.js'
 import { getBoards, saveBoard, deleteBoard } from '../db'
 import Canvas from './Canvas'
@@ -9,7 +9,7 @@ export default function HomeScreen({ onOpenBoard }) {
   const [showNew, setShowNew] = useState(false)
   const [newName, setNewName] = useState('')
   const [newPos, setNewPos] = useState({ x: 100, y: 100 })
-  const [scale, setScale] = useState(1)
+  const scaleRef = useRef(1)
 
   useEffect(() => { load() }, [])
 
@@ -64,13 +64,14 @@ export default function HomeScreen({ onOpenBoard }) {
         <span className="app-title">RefNest</span>
       </header>
 
-      <Canvas onClick={handleCanvasClick}>
+      <Canvas onClick={handleCanvasClick} scaleRef={scaleRef}>
         {boards.map(board => (
           <DraggableCard
             key={board.id}
             x={board.x}
             y={board.y}
-            scale={scale}
+            scaleRef={scaleRef}
+            alwaysDraggable
             onMove={(x, y) => moveBoard(board.id, x, y)}
             onTap={() => onOpenBoard(board.id)}
           >

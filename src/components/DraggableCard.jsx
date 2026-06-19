@@ -2,7 +2,7 @@ import { useRef } from 'react'
 
 const INTERACTIVE = new Set(['INPUT', 'TEXTAREA', 'SELECT', 'A'])
 
-export default function DraggableCard({ x, y, scaleRef, onMove, onTap, children, selected }) {
+export default function DraggableCard({ x, y, scaleRef, onMove, onTap, children, selected, alwaysDraggable }) {
   const isDragging = useRef(false)
   const startPointer = useRef({ x: 0, y: 0 })
   const startPos = useRef({ x: 0, y: 0 })
@@ -18,8 +18,7 @@ export default function DraggableCard({ x, y, scaleRef, onMove, onTap, children,
     e.stopPropagation()
     moved.current = false
     startPointer.current = { x: e.clientX, y: e.clientY }
-    // Only start drag tracking if already selected
-    if (selected) {
+    if (selected || alwaysDraggable) {
       isDragging.current = true
       startPos.current = { x, y }
       ref.current.setPointerCapture(e.pointerId)

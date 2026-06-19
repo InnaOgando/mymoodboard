@@ -292,6 +292,31 @@ body {
 .draggable-card.selected { z-index: 20; }
 
 /* Card delete button */
+.image-action-bar {
+  position: absolute;
+  top: -36px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  z-index: 10;
+}
+.img-action-btn {
+  background: rgba(0,0,0,0.65);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.img-action-delete {
+  background: #e05555;
+  font-weight: 700;
+  font-size: 1rem;
+  padding: 2px 8px;
+}
 .card-delete-btn {
   position: absolute;
   top: -12px;
@@ -505,6 +530,31 @@ body {
 .pinterest-option { color: #e60023; border-color: #e60023; }
 
 /* ── Modals ── */
+.img-fullscreen-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.92);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+.img-fullscreen-hint {
+  color: rgba(255,255,255,0.7);
+  font-size: 0.85rem;
+  text-align: center;
+}
+.img-fullscreen-close {
+  background: rgba(255,255,255,0.15);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 28px;
+  font-size: 1rem;
+  cursor: pointer;
+}
 .modal-overlay {
   position: fixed;
   inset: 0;

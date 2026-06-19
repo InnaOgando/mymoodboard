@@ -261,10 +261,24 @@ function ElementCard({ el, selected, editing, onUpdate, onDelete, onStopEdit, on
 
 function ImageCard({ el, selected, onDelete, onResize, scaleRef }) {
   const w = el.w || 200
+
+  async function shareImage(e) {
+    e.stopPropagation()
+    try {
+      const res = await fetch(el.content.src)
+      const blob = await res.blob()
+      const file = new File([blob], 'image.jpg', { type: 'image/jpeg' })
+      await navigator.share({ files: [file] })
+    } catch {}
+  }
+
   return (
     <div className={`el-card el-image ${selected ? 'selected' : ''}`} style={{ width: w }}>
       {selected && (
-        <button className="card-delete-btn" onClick={e => { e.stopPropagation(); onDelete() }}>×</button>
+        <div className="image-action-bar">
+          <button className="img-action-btn" onPointerDown={e => e.stopPropagation()} onClick={shareImage}>Share / Copy</button>
+          <button className="img-action-btn img-action-delete" onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onDelete() }}>×</button>
+        </div>
       )}
       <img src={el.content.src} alt="" draggable={false} style={{ width: '100%', height: 'auto', display: 'block' }} />
       {selected && <ResizeHandle w={w} h={null} onResize={(nw) => onResize(nw, null)} minW={80} scaleRef={scaleRef} />}
