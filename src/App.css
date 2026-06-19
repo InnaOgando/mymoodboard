@@ -649,25 +649,72 @@ body {
 .pinterest-login-btn { display: flex; align-items: center; justify-content: center; gap: 10px; background: #e60023; color: #fff; border: none; padding: 14px 24px; border-radius: 10px; font-size: 1rem; font-weight: 600; cursor: pointer; width: 100%; font-family: inherit; }
 .pinterest-login-btn:hover { background: #c0001d; }
 
-/* ── Color picker ── */
-.color-picker-row {
+/* ── Color card ── */
+.el-color-card {
+  width: 160px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: none;
+  box-shadow: var(--shadow);
+  min-height: 110px;
+}
+.color-card-hint {
+  font-size: 0.6rem;
+  flex: 1;
+  text-align: center;
+  opacity: 0.7;
+  padding-left: 4px;
+}
+.color-card-codes {
+  padding: 10px 12px 12px;
   display: flex;
-  gap: 4px;
-  padding: 4px 8px;
-  background: rgba(0,0,0,0.04);
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 5px;
 }
-.color-swatch {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  border: 1.5px solid rgba(0,0,0,0.15);
-  cursor: pointer;
+.color-code-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+}
+.color-code-label {
+  font-weight: 700;
+  font-size: 0.68rem;
+  opacity: 0.6;
+  width: 28px;
   flex-shrink: 0;
-  transition: transform 0.1s;
 }
-.color-swatch:hover { transform: scale(1.2); }
-.color-swatch.active { border: 2px solid var(--accent); transform: scale(1.15); }
+.color-code-val {
+  font-family: 'Courier New', monospace;
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+}
+
+/* ── Image long-press copy menu ── */
+.img-copy-menu {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+  background: rgba(0,0,0,0.75);
+  border-radius: 20px;
+  padding: 6px 10px;
+  z-index: 20;
+}
+.img-copy-btn {
+  background: rgba(255,255,255,0.15);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 4px 12px;
+  font-size: 0.82rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.img-copy-btn:hover { background: rgba(255,255,255,0.25); }
+.img-copy-close { padding: 4px 8px; }
 
 /* ── Column card ── */
 .el-column {

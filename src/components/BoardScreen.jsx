@@ -162,6 +162,8 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
       setChildBoards(prev => [...prev, newBoard])
     } else if (type === 'document') {
       docRef.current.click()
+    } else if (type === 'color') {
+      await addElement('color', pendingPos, { color: '#e8315a' })
     } else {
       await addElement(type, pendingPos)
     }
@@ -248,7 +250,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
               if (selectedId === el.id) {
                 if (el.type === 'link' && el.content.url) {
                   window.open(el.content.url, '_blank')
-                } else {
+                } else if (el.type === 'color' || el.type === 'text' || el.type === 'note' || el.type === 'todo' || el.type === 'link') {
                   setEditingId(el.id)
                 }
               } else {
@@ -314,15 +316,43 @@ function ElementCard({ el, selected, editing, onUpdate, onDelete, onStopEdit, on
     case 'todo': return <TodoCard {...props} />
     case 'document': return <DocumentCard {...props} />
     case 'column': return <ColumnCard {...props} />
+    case 'color': return <ColorCard {...props} />
     default: return null
   }
 }
 
 function ImageCard({ el, selected, onDelete, onResize, onMakeColumn, scaleRef }) {
   const w = el.w || 200
+  const [showCopyMenu, setShowCopyMenu] = useState(false)
+  const longTimer = useRef(null)
+
+  function startLong(e) {
+    if (e.pointerType === 'mouse') return
+    longTimer.current = setTimeout(() => setShowCopyMenu(true), 500)
+  }
+  function cancelLong() { clearTimeout(longTimer.current) }
+
+  async function copyImage(e) {
+    e.stopPropagation()
+    setShowCopyMenu(false)
+    try {
+      const res = await fetch(el.content.src)
+      const blob = await res.blob()
+      await navigator.clipboard.write([new ClipboardItem({ 'image/jpeg': blob })])
+    } catch {
+      // fallback: share
+      try {
+        const res = await fetch(el.content.src)
+        const blob = await res.blob()
+        const file = new File([blob], 'image.jpg', { type: 'image/jpeg' })
+        await navigator.share({ files: [file] })
+      } catch {}
+    }
+  }
 
   async function shareImage(e) {
     e.stopPropagation()
+    setShowCopyMenu(false)
     try {
       const res = await fetch(el.content.src)
       const blob = await res.blob()
@@ -332,12 +362,25 @@ function ImageCard({ el, selected, onDelete, onResize, onMakeColumn, scaleRef })
   }
 
   return (
-    <div className={`el-card el-image ${selected ? 'selected' : ''}`} style={{ width: w }}>
+    <div
+      className={`el-card el-image ${selected ? 'selected' : ''}`}
+      style={{ width: w }}
+      onPointerDown={startLong}
+      onPointerUp={cancelLong}
+      onPointerCancel={cancelLong}
+    >
       {selected && (
         <div className="image-action-bar">
           <button className="img-action-btn" onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onMakeColumn?.() }}>+ Column</button>
           <button className="img-action-btn" onPointerDown={e => e.stopPropagation()} onClick={shareImage}>Share</button>
           <button className="img-action-btn img-action-delete" onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onDelete() }}>×</button>
+        </div>
+      )}
+      {showCopyMenu && (
+        <div className="img-copy-menu" onPointerDown={e => e.stopPropagation()}>
+          <button className="img-copy-btn" onClick={copyImage}>Copy</button>
+          <button className="img-copy-btn" onClick={shareImage}>Share</button>
+          <button className="img-copy-btn img-copy-close" onClick={e => { e.stopPropagation(); setShowCopyMenu(false) }}>✕</button>
         </div>
       )}
       <img src={el.content.src} alt="" draggable={false} style={{ width: '100%', height: 'auto', display: 'block' }} />
@@ -346,19 +389,66 @@ function ImageCard({ el, selected, onDelete, onResize, onMakeColumn, scaleRef })
   )
 }
 
-const COLOR_SWATCHES = ['#ffffff', '#fffbe6', '#e8f5e9', '#e3f2fd', '#fce4ec', '#f3e5f5', '#fff3e0', '#f5f5f5', '#1a1a1a']
+function hexToRgb(hex) {
+  const r = parseInt(hex.slice(1,3), 16)
+  const g = parseInt(hex.slice(3,5), 16)
+  const b = parseInt(hex.slice(5,7), 16)
+  return { r, g, b }
+}
 
-function ColorPicker({ current, onColor }) {
+function rgbToHsl(r, g, b) {
+  r /= 255; g /= 255; b /= 255
+  const max = Math.max(r, g, b), min = Math.min(r, g, b)
+  let h, s, l = (max + min) / 2
+  if (max === min) { h = s = 0 } else {
+    const d = max - min
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
+    switch (max) {
+      case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break
+      case g: h = ((b - r) / d + 2) / 6; break
+      default: h = ((r - g) / d + 4) / 6
+    }
+  }
+  return { h: Math.round(h * 360), s: Math.round(s * 100), l: Math.round(l * 100) }
+}
+
+function ColorCard({ el, selected, editing, onUpdate, onDelete }) {
+  const pickerRef = useRef()
+  const color = el.content.color || '#e8315a'
+  const { r, g, b } = hexToRgb(color)
+  const { h, s, l } = rgbToHsl(r, g, b)
+  const isDark = l < 50
+  const textColor = isDark ? '#fff' : '#111'
+
+  useEffect(() => {
+    if (editing && pickerRef.current) {
+      setTimeout(() => pickerRef.current?.click(), 50)
+    }
+  }, [editing])
+
   return (
-    <div className="color-picker-row" onPointerDown={e => e.stopPropagation()}>
-      {COLOR_SWATCHES.map(c => (
-        <button
-          key={c}
-          className={`color-swatch ${current === c ? 'active' : ''}`}
-          style={{ background: c }}
-          onClick={e => { e.stopPropagation(); onColor(c) }}
-        />
-      ))}
+    <div
+      className={`el-card el-color-card ${selected ? 'selected' : ''}`}
+      style={{ background: color }}
+      onPointerDown={e => e.stopPropagation()}
+    >
+      <div className="drag-handle" style={{ background: 'rgba(0,0,0,0.1)' }}>
+        <span className="handle-dots" style={{ color: textColor, opacity: 0.6 }}>⠿</span>
+        <span className="color-card-hint" style={{ color: textColor }}>double tap to pick</span>
+        {selected && <button className="handle-delete" onClick={e => { e.stopPropagation(); onDelete() }}>×</button>}
+      </div>
+      <div className="color-card-codes" style={{ color: textColor }}>
+        <div className="color-code-row"><span className="color-code-label">HEX</span><span className="color-code-val">{color.toUpperCase()}</span></div>
+        <div className="color-code-row"><span className="color-code-label">RGB</span><span className="color-code-val">{r}, {g}, {b}</span></div>
+        <div className="color-code-row"><span className="color-code-label">HSL</span><span className="color-code-val">{h}°, {s}%, {l}%</span></div>
+      </div>
+      <input
+        ref={pickerRef}
+        type="color"
+        value={color}
+        style={{ position: 'absolute', opacity: 0, width: 1, height: 1, bottom: 0, left: 0, pointerEvents: 'none' }}
+        onChange={e => onUpdate({ ...el.content, color: e.target.value })}
+      />
     </div>
   )
 }
@@ -417,12 +507,11 @@ function NoteCard({ el, selected, editing, onUpdate, onDelete, onStopEdit }) {
   )
 }
 
-function TextCard({ el, selected, editing, onUpdate, onDelete, onResize, onColor, scaleRef }) {
+function TextCard({ el, selected, editing, onUpdate, onDelete, onResize, scaleRef }) {
   const ref = useRef()
   const fontSize = el.content.fontSize || 20
   const w = el.w || 220
   const h = el.h || 120
-  const bg = el.content.bgColor || '#ffffff'
 
   useEffect(() => {
     if (editing && ref.current) setTimeout(() => ref.current?.focus(), 50)
@@ -431,17 +520,16 @@ function TextCard({ el, selected, editing, onUpdate, onDelete, onResize, onColor
   return (
     <div
       className={`el-card el-text ${selected ? 'selected' : ''} ${editing ? 'editing' : ''}`}
-      style={{ width: w, height: h, background: bg }}
+      style={{ width: w, height: h }}
     >
       <div className="drag-handle">
         <span className="handle-dots">⠿</span>
         {selected && <button className="handle-delete" onClick={e => { e.stopPropagation(); onDelete() }}>×</button>}
       </div>
-      {selected && <ColorPicker current={bg} onColor={onColor} />}
       <textarea
         ref={ref}
         className="card-textarea card-textarea-text"
-        style={{ fontSize: `${fontSize}px`, height: selected ? h - 56 : h - 28, background: 'transparent' }}
+        style={{ fontSize: `${fontSize}px`, height: h - 28 }}
         value={el.content.text || ''}
         onChange={e => onUpdate({ ...el.content, text: e.target.value })}
         placeholder="Tap to type…"
@@ -451,7 +539,7 @@ function TextCard({ el, selected, editing, onUpdate, onDelete, onResize, onColor
   )
 }
 
-function LinkCard({ el, selected, editing, onUpdate, onDelete, onStopEdit, onEdit, onResize, onColor, scaleRef }) {
+function LinkCard({ el, selected, editing, onUpdate, onDelete, onStopEdit, onEdit, onResize, scaleRef }) {
   const ref = useRef()
   useEffect(() => {
     if (editing && ref.current) setTimeout(() => ref.current?.focus(), 50)
@@ -465,16 +553,14 @@ function LinkCard({ el, selected, editing, onUpdate, onDelete, onStopEdit, onEdi
   }
 
   const w = el.w || 260
-  const bg = el.content.bgColor || '#ffffff'
 
   return (
-    <div className={`el-card el-link ${selected ? 'selected' : ''}`} style={{ width: w, background: bg }}>
+    <div className={`el-card el-link ${selected ? 'selected' : ''}`} style={{ width: w }}>
       <div className="drag-handle">
         <span className="handle-dots">⠿</span>
         {selected && <button className="handle-edit" onClick={e => { e.stopPropagation(); onEdit?.() }}>✎</button>}
         {selected && <button className="handle-delete" onClick={e => { e.stopPropagation(); onDelete() }}>×</button>}
       </div>
-      {selected && <ColorPicker current={bg} onColor={onColor} />}
       {editing ? (
         <div className="link-edit-col">
           <div className="link-edit-row">
@@ -510,10 +596,9 @@ function shortUrl(url) {
   } catch { return url.length > 40 ? url.slice(0, 40) + '…' : url }
 }
 
-function TodoCard({ el, selected, editing, onUpdate, onDelete, onStopEdit, onResize, onColor, scaleRef }) {
+function TodoCard({ el, selected, editing, onUpdate, onDelete, onStopEdit, onResize, scaleRef }) {
   const items = el.content.items?.length ? el.content.items : [{ text: '', done: false }]
   const w = el.w || 260
-  const bg = el.content.bgColor || '#ffffff'
 
   function toggleItem(i) {
     const updated = items.map((item, idx) => {
@@ -543,12 +628,11 @@ function TodoCard({ el, selected, editing, onUpdate, onDelete, onStopEdit, onRes
   }
 
   return (
-    <div className={`el-card el-todo ${selected ? 'selected' : ''}`} style={{ width: w, background: bg }}>
+    <div className={`el-card el-todo ${selected ? 'selected' : ''}`} style={{ width: w }}>
       <div className="drag-handle">
         <span className="handle-dots">⠿</span>
         {selected && <button className="handle-delete" onClick={e => { e.stopPropagation(); onDelete() }}>×</button>}
       </div>
-      {selected && <ColorPicker current={bg} onColor={onColor} />}
       {items.map((item, i) => {
         const text = typeof item === 'object' ? item.text : item
         const done = typeof item === 'object' ? item.done : false

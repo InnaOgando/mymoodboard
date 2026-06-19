@@ -1,7 +1,10 @@
 export default function BottomNav({ onAction }) {
-  const items = [
+  const left = [
     { type: 'text', icon: 'T', label: 'Text' },
     { type: 'link', icon: '🔗', label: 'Link' },
+    { type: 'color', icon: '🎨', label: 'Color' },
+  ]
+  const right = [
     { type: 'todo', icon: '☑️', label: 'To Do' },
     { type: 'image', icon: '🖼️', label: 'Image' },
     { type: 'document', icon: '📄', label: 'Doc' },
@@ -10,7 +13,7 @@ export default function BottomNav({ onAction }) {
   return (
     <div className="bottom-bar board-bottom">
       <div className="bottom-nav">
-        {items.slice(0, 2).map(item => (
+        {left.map(item => (
           <button key={item.type} className="nav-btn" onClick={() => onAction(item.type)}>
             <span className="nav-icon">{item.icon}</span>
             <span className="nav-label">{item.label}</span>
@@ -22,7 +25,7 @@ export default function BottomNav({ onAction }) {
           <span>Board</span>
         </button>
 
-        {items.slice(2).map(item => (
+        {right.map(item => (
           <button key={item.type} className="nav-btn" onClick={() => onAction(item.type)}>
             <span className="nav-icon">{item.icon}</span>
             <span className="nav-label">{item.label}</span>
