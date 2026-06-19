@@ -719,31 +719,6 @@ body {
   letter-spacing: 0.02em;
 }
 
-/* ── Image long-press copy menu ── */
-.img-copy-menu {
-  position: absolute;
-  bottom: 8px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  gap: 6px;
-  background: rgba(0,0,0,0.75);
-  border-radius: 20px;
-  padding: 6px 10px;
-  z-index: 20;
-}
-.img-copy-btn {
-  background: rgba(255,255,255,0.15);
-  color: #fff;
-  border: none;
-  border-radius: 12px;
-  padding: 4px 12px;
-  font-size: 0.82rem;
-  cursor: pointer;
-  white-space: nowrap;
-}
-.img-copy-btn:hover { background: rgba(255,255,255,0.25); }
-.img-copy-close { padding: 4px 8px; }
 
 /* ── Undo toast ── */
 .undo-toast {

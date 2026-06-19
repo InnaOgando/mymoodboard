@@ -401,65 +401,40 @@ function ElementCard({ el, selected, editing, onUpdate, onDelete, onStopEdit, on
 
 function ImageCard({ el, selected, onDelete, onResize, onMakeColumn, scaleRef }) {
   const w = el.w || 200
-  const [showCopyMenu, setShowCopyMenu] = useState(false)
-  const longTimer = useRef(null)
-
-  function startLong(e) {
-    if (e.pointerType === 'mouse') return
-    longTimer.current = setTimeout(() => setShowCopyMenu(true), 500)
-  }
-  function cancelLong() { clearTimeout(longTimer.current) }
 
   async function copyImage(e) {
     e.stopPropagation()
-    setShowCopyMenu(false)
     try {
       const res = await fetch(el.content.src)
       const blob = await res.blob()
       await navigator.clipboard.write([new ClipboardItem({ 'image/jpeg': blob })])
     } catch {
-      // fallback: share
       try {
         const res = await fetch(el.content.src)
         const blob = await res.blob()
-        const file = new File([blob], 'image.jpg', { type: 'image/jpeg' })
-        await navigator.share({ files: [file] })
+        await navigator.share({ files: [new File([blob], 'image.jpg', { type: 'image/jpeg' })] })
       } catch {}
     }
   }
 
   async function shareImage(e) {
     e.stopPropagation()
-    setShowCopyMenu(false)
     try {
       const res = await fetch(el.content.src)
       const blob = await res.blob()
-      const file = new File([blob], 'image.jpg', { type: 'image/jpeg' })
-      await navigator.share({ files: [file] })
+      await navigator.share({ files: [new File([blob], 'image.jpg', { type: 'image/jpeg' })] })
     } catch {}
   }
 
   return (
-    <div
-      className={`el-card el-image ${selected ? 'selected' : ''}`}
-      style={{ width: w }}
-      onPointerDown={startLong}
-      onPointerUp={cancelLong}
-      onPointerCancel={cancelLong}
-    >
+    <div className={`el-card el-image ${selected ? 'selected' : ''}`} style={{ width: w }}>
       <img src={el.content.src} alt="" draggable={false} style={{ width: '100%', height: 'auto', display: 'block' }} />
       {selected && (
-        <div className="image-action-bar">
-          <button className="img-action-btn" onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onMakeColumn?.() }}>+ Column</button>
-          <button className="img-action-btn" onPointerDown={e => e.stopPropagation()} onClick={shareImage}>Share</button>
-          <button className="img-action-btn img-action-delete" onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onDelete() }}>×</button>
-        </div>
-      )}
-      {selected && showCopyMenu && (
-        <div className="img-copy-menu" onPointerDown={e => e.stopPropagation()}>
-          <button className="img-copy-btn" onClick={copyImage}>Copy</button>
-          <button className="img-copy-btn" onClick={shareImage}>Share</button>
-          <button className="img-copy-btn img-copy-close" onClick={e => { e.stopPropagation(); setShowCopyMenu(false) }}>✕</button>
+        <div className="image-action-bar" onPointerDown={e => e.stopPropagation()}>
+          <button className="img-action-btn" onClick={e => { e.stopPropagation(); onMakeColumn?.() }}>+ Column</button>
+          <button className="img-action-btn" onClick={copyImage}>Copy</button>
+          <button className="img-action-btn" onClick={shareImage}>Share</button>
+          <button className="img-action-btn img-action-delete" onClick={e => { e.stopPropagation(); onDelete() }}>×</button>
         </div>
       )}
       {selected && <ResizeHandle w={w} h={null} onResize={(nw) => onResize(nw, null)} minW={80} scaleRef={scaleRef} />}
