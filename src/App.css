@@ -801,18 +801,17 @@ body {
   pointer-events: none;
   user-select: none;
 }
-.col-img-remove {
+.col-img-eject {
   position: absolute;
   top: 4px;
   right: 4px;
-  background: rgba(0,0,0,0.55);
+  background: rgba(0,0,0,0.6);
   color: #fff;
   border: none;
   border-radius: 50%;
-  width: 22px;
-  height: 22px;
+  width: 26px;
+  height: 26px;
   font-size: 0.9rem;
-  font-weight: 700;
   cursor: pointer;
   display: flex;
   align-items: center;

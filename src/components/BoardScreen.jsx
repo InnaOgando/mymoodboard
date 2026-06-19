@@ -153,14 +153,31 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
     setElements(prev => prev.map(e => e.id === colId ? updated : e))
   }
 
-  async function removeImageFromColumn(colId, imgId) {
-    const col = elements.find(e => e.id === colId)
+  async function ejectImageFromColumn(colId, imgId) {
+    const col = elementsRef.current.find(e => e.id === colId)
     if (!col) return
+    const img = (col.content.images || []).find(i => i.id === imgId)
+    if (!img) return
     const images = col.content.images.filter(i => i.id !== imgId)
-    if (images.length === 0) { await removeElement(colId); return }
-    const updated = { ...col, content: { ...col.content, images } }
-    await saveElement(updated)
-    setElements(prev => prev.map(e => e.id === colId ? updated : e))
+    // Place ejected image beside the column
+    const ejected = {
+      id: uid(), boardId, type: 'image',
+      x: col.x + (col.w || 220) + 24,
+      y: col.y,
+      w: col.w || 220,
+      content: { src: img.src },
+      createdAt: Date.now()
+    }
+    await saveElement(ejected)
+    if (images.length === 0) {
+      await deleteElement(colId)
+      setElements(prev => prev.filter(e => e.id !== colId).concat(ejected))
+    } else {
+      const updated = { ...col, content: { ...col.content, images } }
+      await saveElement(updated)
+      setElements(prev => prev.map(e => e.id === colId ? updated : e).concat(ejected))
+    }
+    setSelectedId(ejected.id)
   }
 
   function hitTestColumn(cx, cy) {
@@ -346,7 +363,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
               onColor={color => colorElement(el.id, color)}
               onMakeColumn={() => makeColumn(el)}
               onAddColumnImage={() => { setColumnTarget(el.id); columnFileRef.current.click() }}
-              onRemoveColumnImage={imgId => removeImageFromColumn(el.id, imgId)}
+              onRemoveColumnImage={imgId => ejectImageFromColumn(el.id, imgId)}
               isDropTarget={dropOverColumnId === el.id}
               scaleRef={scaleRef}
             />
@@ -522,7 +539,7 @@ function ColumnCard({ el, selected, isDropTarget, onDelete, onResize, onAddColum
           <div key={img.id} className="column-img-wrap">
             <img src={img.src} alt="" draggable={false} style={{ width: '100%', display: 'block' }} />
             {selected && (
-              <button className="col-img-remove" onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onRemoveColumnImage?.(img.id) }}>×</button>
+              <button className="col-img-eject" title="Move to canvas" onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onRemoveColumnImage?.(img.id) }}>↗</button>
             )}
           </div>
         ))}
