@@ -277,27 +277,15 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
     await load()
   }
 
-  async function pasteFromClipboard() {
-    // 1. Check internal app clipboard first (set by Copy button on image cards)
+  function pasteFromClipboard() {
+    // Check internal app clipboard (set by Copy button) — synchronous, no permission needed
     const internal = sessionStorage.getItem('refnest_copied_image')
     if (internal) {
-      await addElement('image', pendingPos, { src: internal })
+      addElement('image', pendingPos, { src: internal })
       return
     }
-    // 2. Try OS clipboard API (works on HTTPS desktop/Android)
-    try {
-      const items = await navigator.clipboard.read()
-      for (const item of items) {
-        const imgType = item.types.find(t => t.startsWith('image/'))
-        if (imgType) {
-          const blob = await item.getType(imgType)
-          const data = await compressImage(blob)
-          await addElement('image', pendingPos, { src: data })
-          return
-        }
-      }
-    } catch {}
-    // 3. Fallback: open photo picker
+    // Open photo picker synchronously — MUST be called directly in user gesture context
+    // (iOS blocks .click() after any await/catch)
     fileRef.current.click()
   }
 
