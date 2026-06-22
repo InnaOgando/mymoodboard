@@ -265,10 +265,34 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
     }
   }
 
-  // Synchronous — iOS blocks .click() after any await
-  function pasteFromClipboard() {
+  async function pasteFromClipboard() {
     const internal = sessionStorage.getItem('refmemo_copied_image')
     if (internal) { addElement('image', pendingPos, { src: internal }); return }
+    // On HTTPS: try clipboard API (reads screenshot without going through Photos)
+    if (location.protocol === 'https:' && navigator.clipboard?.read) {
+      try {
+        const items = await navigator.clipboard.read()
+        for (const item of items) {
+          const imageType = item.types.find(t => t.startsWith('image/'))
+          if (imageType) {
+            const blob = await item.getType(imageType)
+            const data = await compressImage(blob)
+            const el = await addElement('image', pendingPos, { src: data }, { skipRemote: true })
+            uploadImage(blob).then(url => updateContent(el.id, { src: url })).catch(() => {
+              saveElement(elementsRef.current.find(e => e.id === el.id) || el)
+            })
+            return
+          }
+        }
+        // No image in clipboard
+        fileRef.current.click()
+      } catch {
+        // Permission denied — fall back to file picker
+        fileRef.current.click()
+      }
+      return
+    }
+    // HTTP local: file picker only
     fileRef.current.click()
   }
 
