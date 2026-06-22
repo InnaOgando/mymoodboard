@@ -34,6 +34,7 @@ async function currentUserId() {
 
 export async function getBoards(parentId = null) {
   const userId = await currentUserId()
+  const db = await getDB()
   if (userId) {
     const pid = toParentId(parentId)
     const { data, error } = await supabase
@@ -41,15 +42,22 @@ export async function getBoards(parentId = null) {
       .select('*')
       .eq('user_id', userId)
       .eq('parent_id', pid)
-    if (!error && data) return data.map(fromSupabaseBoard)
+    if (!error && data) {
+      const boards = data.map(fromSupabaseBoard)
+      // Populate IndexedDB cache for offline use
+      const tx = db.transaction('boards', 'readwrite')
+      for (const b of boards) await tx.objectStore('boards').put({ ...b, parentId: toParentId(b.parentId) })
+      await tx.done
+      return boards
+    }
   }
   // Offline fallback
-  const db = await getDB()
   return db.getAllFromIndex('boards', 'parentId', toParentId(parentId))
 }
 
 export async function getBoard(id) {
   const userId = await currentUserId()
+  const db = await getDB()
   if (userId) {
     const { data, error } = await supabase
       .from('boards')
@@ -57,9 +65,12 @@ export async function getBoard(id) {
       .eq('id', id)
       .eq('user_id', userId)
       .single()
-    if (!error && data) return fromSupabaseBoard(data)
+    if (!error && data) {
+      const board = fromSupabaseBoard(data)
+      await db.put('boards', { ...board, parentId: toParentId(board.parentId) })
+      return board
+    }
   }
-  const db = await getDB()
   return db.get('boards', id)
 }
 
@@ -93,15 +104,22 @@ export async function deleteBoard(id) {
 
 export async function getElements(boardId) {
   const userId = await currentUserId()
+  const db = await getDB()
   if (userId) {
     const { data, error } = await supabase
       .from('elements')
       .select('*')
       .eq('board_id', boardId)
       .eq('user_id', userId)
-    if (!error && data) return data.map(fromSupabaseElement)
+    if (!error && data) {
+      const elements = data.map(fromSupabaseElement)
+      // Populate IndexedDB cache for offline use
+      const tx = db.transaction('elements', 'readwrite')
+      for (const el of elements) await tx.objectStore('elements').put(el)
+      await tx.done
+      return elements
+    }
   }
-  const db = await getDB()
   return db.getAllFromIndex('elements', 'boardId', boardId)
 }
 

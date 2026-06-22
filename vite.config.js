@@ -35,6 +35,14 @@ export default defineConfig({
       workbox: {
         runtimeCaching: [
           {
+            urlPattern: /^https:\/\/iunqiswpbqijkqylfrll\.supabase\.co\/storage\/.*/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'supabase-images',
+              expiration: { maxEntries: 3000, maxAgeSeconds: 60 * 60 * 24 * 90 }
+            }
+          },
+          {
             urlPattern: /^https:\/\/i\.pinimg\.com\/.*/i,
             handler: 'CacheFirst',
             options: {

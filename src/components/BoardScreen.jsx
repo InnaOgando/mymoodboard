@@ -6,6 +6,7 @@ import DraggableCard from './DraggableCard'
 import BottomNav from './BottomNav'
 import ImagePicker from './ImagePicker'
 import { compressImage } from '../compress.js'
+import { uploadImage, deleteImage } from '../storage.js'
 
 export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, onHome }) {
   const [board, setBoard] = useState(null)
@@ -62,7 +63,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
       type,
       x: pos.x,
       y: pos.y,
-      width: type === 'image' ? 200 : 180,
+      w: type === 'image' ? 150 : undefined,
       content,
       createdAt: Date.now()
     }
@@ -97,6 +98,10 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
     await deleteElement(id)
     setElements(prev => prev.filter(e => e.id !== id))
     if (el) {
+      // Delete from Storage if it's a Storage URL (not base64)
+      if (el.type === 'image' && el.content?.src?.startsWith('http')) {
+        deleteImage(el.content.src)
+      }
       setUndoStack(prev => [...prev.slice(-19), el])
       setUndoVisible(true)
       clearTimeout(undoTimer.current)
@@ -127,26 +132,25 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
 
   async function makeColumn(imageEl) {
     try {
-    // Remove original image element and create a column with it
-    await deleteElement(imageEl.id)
-    const col = {
-      id: uid(),
-      boardId,
-      type: 'column',
-      x: imageEl.x,
-      y: imageEl.y,
-      w: imageEl.w || 200,
-      content: { images: [{ id: uid(), src: imageEl.content.src }] },
-      createdAt: Date.now()
-    }
-    await saveElement(col)
-    setElements(prev => [...prev.filter(e => e.id !== imageEl.id), col])
-    setSelectedId(col.id)
+      await deleteElement(imageEl.id)
+      const col = {
+        id: uid(),
+        boardId,
+        type: 'column',
+        x: imageEl.x,
+        y: imageEl.y,
+        w: imageEl.w || 150,
+        content: { images: [{ id: uid(), src: imageEl.content.src }] },
+        createdAt: Date.now()
+      }
+      await saveElement(col)
+      setElements(prev => [...prev.filter(e => e.id !== imageEl.id), col])
+      setSelectedId(null)  // close popup
     } catch(err) { console.error('makeColumn failed', err) }
   }
 
   async function addImageToColumn(colId, src) {
-    const col = elements.find(e => e.id === colId)
+    const col = elementsRef.current.find(e => e.id === colId)  // always fresh
     if (!col) return
     const updated = { ...col, content: { ...col.content, images: [...(col.content.images || []), { id: uid(), src }] } }
     await saveElement(updated)
@@ -180,14 +184,14 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
     setSelectedId(ejected.id)
   }
 
-  function hitTestColumn(cx, cy) {
-    // Use elementsRef so this always sees the latest elements (no stale closure)
+
+  function hitTestColumn(imageId, cx, cy) {
     const cols = elementsRef.current.filter(e => e.type === 'column')
     for (const col of cols) {
-      const colW = (col.w || 220) + 40  // +40px generous margin
+      const colW = col.w || 220
       const numImages = (col.content.images || []).length
-      const colH = numImages * 220 + 80 // generous estimate
-      if (cx >= col.x - 20 && cx <= col.x + colW && cy >= col.y - 20 && cy <= col.y + colH) {
+      const colH = numImages * (col.w || 220) + 60
+      if (cx >= col.x && cx <= col.x + colW && cy >= col.y && cy <= col.y + colH) {
         return col.id
       }
     }
@@ -195,27 +199,31 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
   }
 
   function handleImageDragMove(imageEl, nx, ny) {
-    const cx = nx + (imageEl.w || 200) / 2
-    const cy = ny + 80
-    setDropOverColumnId(hitTestColumn(cx, cy))
+    const cx = nx + (imageEl.w || 150) / 2
+    const cy = ny + (imageEl.w || 150) / 2
+    setDropOverColumnId(hitTestColumn(imageEl.id, cx, cy))
   }
 
   async function handleImageDragEnd(imageEl, nx, ny) {
+    const cx = nx + (imageEl.w || 150) / 2
+    const cy = ny + (imageEl.w || 150) / 2
+    const colId = hitTestColumn(imageEl.id, cx, cy)
     setDropOverColumnId(null)
-    const cx = nx + (imageEl.w || 200) / 2
-    const cy = ny + 80
-    const colId = hitTestColumn(cx, cy)
     if (!colId) return
+    // Use elementsRef for fresh col data — avoids stale closure duplicate bug
     const col = elementsRef.current.find(e => e.id === colId)
     if (!col) return
     try {
-      await deleteElement(imageEl.id)
       const updated = {
         ...col,
         content: { ...col.content, images: [...(col.content.images || []), { id: uid(), src: imageEl.content.src }] }
       }
       await saveElement(updated)
-      setElements(prev => prev.filter(e => e.id !== imageEl.id).map(e => e.id === colId ? updated : e))
+      await deleteElement(imageEl.id)
+      setElements(prev => prev
+        .filter(e => e.id !== imageEl.id)
+        .map(e => e.id === colId ? updated : e)
+      )
       setSelectedId(colId)
     } catch (err) { console.error('drop into column failed', err) }
   }
@@ -253,21 +261,47 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
   }
 
   async function handleImageSave(imageData) {
-    await addElement('image', pendingPos, { src: imageData })
+    // imageData is a base64 dataURL from ImagePicker — convert to blob and upload
+    try {
+      const res = await fetch(imageData)
+      const blob = await res.blob()
+      const url = await uploadImage(blob)
+      await addElement('image', pendingPos, { src: url })
+    } catch {
+      await addElement('image', pendingPos, { src: imageData })
+    }
     setShowImagePicker(false)
   }
 
   async function handleFiles(files) {
+    const IMG_W = 150
+    const GAP = 12
+    const COLS = 2
+    let imgIndex = 0
+
     for (const file of files) {
       const isImage = file.type.startsWith('image/')
       const isPdf = file.type === 'application/pdf'
       const isDoc = file.name.match(/\.(doc|docx)$/i)
 
       if (isImage) {
-        const data = await compressImage(file)
-        await addElement('image', { x: pendingPos.x + Math.random() * 40, y: pendingPos.y + Math.random() * 40 }, { src: data })
+        const col = imgIndex % COLS
+        const row = Math.floor(imgIndex / COLS)
+        const pos = {
+          x: pendingPos.x + col * (IMG_W + GAP),
+          y: pendingPos.y + row * (IMG_W + GAP)
+        }
+        imgIndex++
+        try {
+          const url = await uploadImage(file)
+          await addElement('image', pos, { src: url })
+        } catch {
+          const data = await compressImage(file)
+          await addElement('image', pos, { src: data })
+        }
       } else if (isPdf || isDoc) {
-        await addElement('document', { x: pendingPos.x + Math.random() * 40, y: pendingPos.y + Math.random() * 40 }, {
+        const pos = { x: pendingPos.x + Math.random() * 40, y: pendingPos.y + Math.random() * 40 }
+        await addElement('document', pos, {
           name: file.name,
           type: file.type,
           src: await fileToBase64(file)
@@ -278,27 +312,28 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
   }
 
   async function pasteFromClipboard() {
-    // Check internal app clipboard first (synchronous, no permission)
     const internal = sessionStorage.getItem('refmemo_copied_image')
     if (internal) {
       addElement('image', pendingPos, { src: internal })
       return
     }
-    // Try system clipboard — must be called directly from user gesture (no prior await)
-    // Works on iOS 16+ Safari and desktop Chrome/Safari
     try {
       const items = await navigator.clipboard.read()
       for (const item of items) {
         const imgType = item.types.find(t => t.startsWith('image/'))
         if (imgType) {
           const blob = await item.getType(imgType)
-          const data = await compressImage(blob)
-          addElement('image', pendingPos, { src: data })
+          try {
+            const url = await uploadImage(blob)
+            addElement('image', pendingPos, { src: url })
+          } catch {
+            const data = await compressImage(blob)
+            addElement('image', pendingPos, { src: data })
+          }
           return
         }
       }
     } catch {}
-    // Nothing in clipboard — tell user
     alert('Sem imagem no clipboard. Usa o botão Imagem para escolher da galeria.')
   }
 
@@ -415,8 +450,13 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
         onChange={async e => {
           if (!columnTarget) return
           for (const file of Array.from(e.target.files)) {
-            const src = await compressImage(file)
-            await addImageToColumn(columnTarget, src)
+            try {
+              const src = await uploadImage(file)
+              await addImageToColumn(columnTarget, src)
+            } catch {
+              const src = await compressImage(file)
+              await addImageToColumn(columnTarget, src)
+            }
           }
           setColumnTarget(null)
           e.target.value = ''
@@ -457,7 +497,7 @@ function ElementCard({ el, selected, editing, onUpdate, onDelete, onStopEdit, on
 }
 
 function ImageCard({ el, selected, onDelete, onResize, onMakeColumn, scaleRef }) {
-  const w = el.w || 200
+  const w = el.w || 150
   const [copied, setCopied] = useState(false)
 
   function copyImage(e) {
@@ -480,10 +520,12 @@ function ImageCard({ el, selected, onDelete, onResize, onMakeColumn, scaleRef })
     <div style={{ position: 'relative', width: w }}>
       {selected && (
         <div className="img-popup-menu" onPointerDown={e => e.stopPropagation()}>
-          <button className="img-popup-btn" onClick={e => { e.stopPropagation(); onMakeColumn?.() }}>+ Column</button>
-          <button className="img-popup-btn" onClick={copyImage}>{copied ? '✓ Copied' : 'Copy'}</button>
-          <button className="img-popup-btn" onClick={shareImage}>Share</button>
-          <button className="img-popup-btn img-popup-delete" onClick={e => { e.stopPropagation(); onDelete() }}>×</button>
+          <button className="img-popup-btn" onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onMakeColumn?.() }}>+ Col</button>
+          <button className="img-popup-btn" onPointerDown={e => e.stopPropagation()} onClick={copyImage}>{copied ? '✓' : 'Copy'}</button>
+          <button className="img-popup-btn" onPointerDown={e => e.stopPropagation()} onClick={shareImage}>Share</button>
+          <button className="img-popup-btn img-popup-delete"
+            onPointerDown={e => e.stopPropagation()}
+            onClick={e => { e.stopPropagation(); onDelete() }}>×</button>
         </div>
       )}
       <div className={`el-card el-image ${selected ? 'selected' : ''}`} style={{ width: w }}>
