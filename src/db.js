@@ -75,13 +75,12 @@ export async function getBoard(id) {
 }
 
 export async function saveBoard(board) {
-  const userId = await currentUserId()
   const db = await getDB()
   const normalized = { ...board, parentId: toParentId(board.parentId) }
   await db.put('boards', normalized)
-  if (userId) {
-    await supabase.from('boards').upsert(toSupabaseBoard(normalized, userId))
-  }
+  currentUserId().then(userId => {
+    if (userId) supabase.from('boards').upsert(toSupabaseBoard(normalized, userId))
+  })
 }
 
 export async function deleteBoard(id) {
@@ -123,22 +122,23 @@ export async function getElements(boardId) {
   return db.getAllFromIndex('elements', 'boardId', boardId)
 }
 
-export async function saveElement(el) {
-  const userId = await currentUserId()
+export async function saveElement(el, { skipRemote = false } = {}) {
   const db = await getDB()
   await db.put('elements', el)
-  if (userId) {
-    await supabase.from('elements').upsert(toSupabaseElement(el, userId))
+  if (!skipRemote) {
+    currentUserId().then(userId => {
+      if (userId) supabase.from('elements').upsert(toSupabaseElement(el, userId))
+    })
   }
 }
 
 export async function deleteElement(id) {
-  const userId = await currentUserId()
   const db = await getDB()
   await db.delete('elements', id)
-  if (userId) {
-    await supabase.from('elements').delete().eq('id', id).eq('user_id', userId)
-  }
+  // Supabase sync in background — don't block UI
+  currentUserId().then(userId => {
+    if (userId) supabase.from('elements').delete().eq('id', id).eq('user_id', userId)
+  })
 }
 
 // ── Shape converters ──────────────────────────────────────

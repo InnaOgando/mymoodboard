@@ -659,7 +659,11 @@ body {
   color: var(--text);
 }
 .picker-option:hover { background: var(--border-light); }
-.pinterest-option { color: #e60023; border-color: #e60023; }
+.picker-option-disabled { opacity: 0.45; cursor: default; }
+.picker-option-disabled:hover { background: var(--canvas-bg); }
+.picker-icon { font-size: 1.3rem; }
+.picker-soon { margin-left: auto; font-size: 0.75rem; color: var(--muted); background: var(--border-light); padding: 2px 6px; border-radius: 4px; }
+.image-picker-modal { width: 300px; }
 
 /* ── Modals ── */
 .img-fullscreen-overlay {
