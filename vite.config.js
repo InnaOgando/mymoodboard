@@ -9,11 +9,11 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico'],
       manifest: {
-        name: 'My Moodboard',
-        short_name: 'Moodboard',
-        description: 'Visual reference moodboard for illustration projects',
-        theme_color: '#1a1a2e',
-        background_color: '#1a1a2e',
+        name: 'RefMemo',
+        short_name: 'RefMemo',
+        description: 'Visual reference boards for illustration projects',
+        theme_color: '#ffffff',
+        background_color: '#ffffff',
         display: 'standalone',
         orientation: 'portrait',
         icons: [

@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
 import { uid } from '../utils.js'
 import { getBoards, saveBoard, deleteBoard } from '../db'
+import { supabase } from '../supabase'
 import Canvas from './Canvas'
 import DraggableCard from './DraggableCard'
 
-export default function HomeScreen({ onOpenBoard }) {
+export default function HomeScreen({ onOpenBoard, session }) {
   const [boards, setBoards] = useState([])
   const [showNew, setShowNew] = useState(false)
   const [newName, setNewName] = useState('')
@@ -61,7 +62,8 @@ export default function HomeScreen({ onOpenBoard }) {
   return (
     <div className="screen">
       <header className="top-bar">
-        <span className="app-title">RefNest</span>
+        <span className="app-title">RefMemo</span>
+        <button className="logout-btn" title="Sair" onClick={() => supabase.auth.signOut()}>↪</button>
       </header>
 
       <Canvas onClick={handleCanvasClick} scaleRef={scaleRef}>

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { uid } from '../utils.js'
-import { getBoard, getBoards, saveBoard, deleteBoard, getElements, saveElement, deleteElement } from '../db'
+import { getBoard, getBoards, saveBoard, deleteBoard, getElements, saveElement, deleteElement, exportAllData, importAllData } from '../db'
 import Canvas from './Canvas'
 import DraggableCard from './DraggableCard'
 import BottomNav from './BottomNav'
@@ -277,16 +277,59 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
     await load()
   }
 
-  function pasteFromClipboard() {
-    // Check internal app clipboard (set by Copy button) — synchronous, no permission needed
-    const internal = sessionStorage.getItem('refnest_copied_image')
+  async function pasteFromClipboard() {
+    // Check internal app clipboard first (synchronous, no permission)
+    const internal = sessionStorage.getItem('refmemo_copied_image')
     if (internal) {
       addElement('image', pendingPos, { src: internal })
       return
     }
-    // Open photo picker synchronously — MUST be called directly in user gesture context
-    // (iOS blocks .click() after any await/catch)
-    fileRef.current.click()
+    // Try system clipboard — must be called directly from user gesture (no prior await)
+    // Works on iOS 16+ Safari and desktop Chrome/Safari
+    try {
+      const items = await navigator.clipboard.read()
+      for (const item of items) {
+        const imgType = item.types.find(t => t.startsWith('image/'))
+        if (imgType) {
+          const blob = await item.getType(imgType)
+          const data = await compressImage(blob)
+          addElement('image', pendingPos, { src: data })
+          return
+        }
+      }
+    } catch {}
+    // Nothing in clipboard — tell user
+    alert('Sem imagem no clipboard. Usa o botão Imagem para escolher da galeria.')
+  }
+
+  async function handleExport() {
+    const data = await exportAllData()
+    const json = JSON.stringify(data)
+    const blob = new Blob([json], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `refmemo-backup-${new Date().toISOString().slice(0,10)}.json`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    setTimeout(() => URL.revokeObjectURL(url), 5000)
+  }
+
+  const importRef = useRef()
+  async function handleImport(e) {
+    const file = e.target.files[0]
+    if (!file) return
+    try {
+      const text = await file.text()
+      const data = JSON.parse(text)
+      await importAllData(data)
+      await load()
+      alert('Backup restaurado!')
+    } catch {
+      alert('Erro ao restaurar backup. Ficheiro inválido.')
+    }
+    e.target.value = ''
   }
 
   if (!board) return null
@@ -296,7 +339,9 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
       <header className="top-bar">
         <button className="back-btn" onClick={onBack}>‹</button>
         <span className="board-title">{board.name}</span>
-        <button className="paste-img-btn" onClick={pasteFromClipboard} title="Add screenshot">📷</button>
+        <button className="paste-img-btn" onClick={pasteFromClipboard} title="Colar screenshot">📷</button>
+        <button className="backup-btn" onClick={handleExport} title="Exportar backup">⬇︎</button>
+        <button className="backup-btn" onClick={() => importRef.current.click()} title="Restaurar backup">⬆︎</button>
         <button className="home-btn" onClick={onHome}>⌂</button>
       </header>
 
@@ -363,6 +408,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
 
       <input ref={fileRef} type="file" accept="image/*" multiple style={{ display: 'none' }}
         onChange={e => handleFiles(Array.from(e.target.files))} />
+      <input ref={importRef} type="file" accept=".json" style={{ display: 'none' }} onChange={handleImport} />
       <input ref={docRef} type="file" accept=".pdf,.doc,.docx,image/*" multiple style={{ display: 'none' }}
         onChange={e => handleFiles(Array.from(e.target.files))} />
       <input ref={columnFileRef} type="file" accept="image/*" multiple style={{ display: 'none' }}
@@ -416,7 +462,7 @@ function ImageCard({ el, selected, onDelete, onResize, onMakeColumn, scaleRef })
 
   function copyImage(e) {
     e.stopPropagation()
-    sessionStorage.setItem('refnest_copied_image', el.content.src)
+    sessionStorage.setItem('refmemo_copied_image', el.content.src)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
