@@ -25,7 +25,7 @@ export async function getDB() {
   })
 }
 
-// Cache userId from auth state — avoids getSession() failing after tab suspension
+// Cache userId — fast path. Falls back to getSession() if cache not ready yet.
 let _cachedUserId = null
 supabase.auth.onAuthStateChange((_event, session) => {
   _cachedUserId = session?.user?.id ?? null
@@ -34,14 +34,17 @@ supabase.auth.getSession().then(({ data }) => {
   _cachedUserId = data?.session?.user?.id ?? null
 })
 
-function currentUserId() {
+async function currentUserId() {
+  if (_cachedUserId) return _cachedUserId
+  const { data } = await supabase.auth.getSession()
+  _cachedUserId = data?.session?.user?.id ?? null
   return _cachedUserId
 }
 
 // ── Boards ──────────────────────────────────────────────
 
 export async function getBoards(parentId = null) {
-  const userId = currentUserId()
+  const userId = await currentUserId()
   const db = await getDB()
   if (userId) {
     const pid = toParentId(parentId)
@@ -50,19 +53,23 @@ export async function getBoards(parentId = null) {
       .select('*')
       .eq('user_id', userId)
       .eq('parent_id', pid)
-    if (!error && data) {
+    if (!error && data && data.length > 0) {
       const boards = data.map(fromSupabaseBoard)
       const tx = db.transaction('boards', 'readwrite')
       for (const b of boards) await tx.objectStore('boards').put({ ...b, parentId: toParentId(b.parentId) })
       await tx.done
       return boards
     }
+    // Supabase returned empty — trust IndexedDB (may have unsynced data)
+    const local = await db.getAllFromIndex('boards', 'parentId', toParentId(parentId))
+    if (local.length > 0) return local
+    return []
   }
   return db.getAllFromIndex('boards', 'parentId', toParentId(parentId))
 }
 
 export async function getBoard(id) {
-  const userId = currentUserId()
+  const userId = await currentUserId()
   const db = await getDB()
   if (userId) {
     const { data, error } = await supabase
@@ -84,7 +91,7 @@ export async function saveBoard(board) {
   const db = await getDB()
   const normalized = { ...board, parentId: toParentId(board.parentId) }
   await db.put('boards', normalized)
-  const userId = currentUserId()
+  const userId = await currentUserId()
   if (userId) supabase.from('boards').upsert(toSupabaseBoard(normalized, userId))
 }
 
@@ -97,8 +104,7 @@ export async function deleteBoard(id) {
   for (const el of elements) await tx.objectStore('elements').delete(el.id)
   await tx.objectStore('boards').delete(id)
   await tx.done
-  // Supabase in background
-  const userId = currentUserId()
+  const userId = await currentUserId()
   if (userId) {
     supabase.from('elements').delete().eq('board_id', id).eq('user_id', userId)
     supabase.from('boards').delete().eq('id', id).eq('user_id', userId)
@@ -108,7 +114,7 @@ export async function deleteBoard(id) {
 // ── Elements ─────────────────────────────────────────────
 
 export async function getElements(boardId) {
-  const userId = currentUserId()
+  const userId = await currentUserId()
   const db = await getDB()
   if (userId) {
     const { data, error } = await supabase
@@ -116,13 +122,16 @@ export async function getElements(boardId) {
       .select('*')
       .eq('board_id', boardId)
       .eq('user_id', userId)
-    if (!error && data) {
+    if (!error && data && data.length > 0) {
       const elements = data.map(fromSupabaseElement)
       const tx = db.transaction('elements', 'readwrite')
       for (const el of elements) await tx.objectStore('elements').put(el)
       await tx.done
       return elements
     }
+    const local = await db.getAllFromIndex('elements', 'boardId', boardId)
+    if (local.length > 0) return local
+    return []
   }
   return db.getAllFromIndex('elements', 'boardId', boardId)
 }
@@ -131,7 +140,7 @@ export async function saveElement(el, { skipRemote = false } = {}) {
   const db = await getDB()
   await db.put('elements', el)
   if (!skipRemote) {
-    const userId = currentUserId()
+    const userId = await currentUserId()
     if (userId) supabase.from('elements').upsert(toSupabaseElement(el, userId))
   }
 }
@@ -139,7 +148,7 @@ export async function saveElement(el, { skipRemote = false } = {}) {
 export async function deleteElement(id) {
   const db = await getDB()
   await db.delete('elements', id)
-  const userId = currentUserId()
+  const userId = await currentUserId()
   if (userId) supabase.from('elements').delete().eq('id', id).eq('user_id', userId)
 }
 
