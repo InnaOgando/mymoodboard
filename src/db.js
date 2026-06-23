@@ -25,15 +25,23 @@ export async function getDB() {
   })
 }
 
-async function currentUserId() {
-  const { data } = await supabase.auth.getSession()
-  return data?.session?.user?.id ?? null
+// Cache userId from auth state — avoids getSession() failing after tab suspension
+let _cachedUserId = null
+supabase.auth.onAuthStateChange((_event, session) => {
+  _cachedUserId = session?.user?.id ?? null
+})
+supabase.auth.getSession().then(({ data }) => {
+  _cachedUserId = data?.session?.user?.id ?? null
+})
+
+function currentUserId() {
+  return _cachedUserId
 }
 
 // ── Boards ──────────────────────────────────────────────
 
 export async function getBoards(parentId = null) {
-  const userId = await currentUserId()
+  const userId = currentUserId()
   const db = await getDB()
   if (userId) {
     const pid = toParentId(parentId)
@@ -44,19 +52,17 @@ export async function getBoards(parentId = null) {
       .eq('parent_id', pid)
     if (!error && data) {
       const boards = data.map(fromSupabaseBoard)
-      // Populate IndexedDB cache for offline use
       const tx = db.transaction('boards', 'readwrite')
       for (const b of boards) await tx.objectStore('boards').put({ ...b, parentId: toParentId(b.parentId) })
       await tx.done
       return boards
     }
   }
-  // Offline fallback
   return db.getAllFromIndex('boards', 'parentId', toParentId(parentId))
 }
 
 export async function getBoard(id) {
-  const userId = await currentUserId()
+  const userId = currentUserId()
   const db = await getDB()
   if (userId) {
     const { data, error } = await supabase
@@ -78,13 +84,11 @@ export async function saveBoard(board) {
   const db = await getDB()
   const normalized = { ...board, parentId: toParentId(board.parentId) }
   await db.put('boards', normalized)
-  currentUserId().then(userId => {
-    if (userId) supabase.from('boards').upsert(toSupabaseBoard(normalized, userId))
-  })
+  const userId = currentUserId()
+  if (userId) supabase.from('boards').upsert(toSupabaseBoard(normalized, userId))
 }
 
 export async function deleteBoard(id) {
-  const userId = await currentUserId()
   const db = await getDB()
   const children = await getBoards(id)
   for (const child of children) await deleteBoard(child.id)
@@ -93,16 +97,18 @@ export async function deleteBoard(id) {
   for (const el of elements) await tx.objectStore('elements').delete(el.id)
   await tx.objectStore('boards').delete(id)
   await tx.done
+  // Supabase in background
+  const userId = currentUserId()
   if (userId) {
-    await supabase.from('elements').delete().eq('board_id', id).eq('user_id', userId)
-    await supabase.from('boards').delete().eq('id', id).eq('user_id', userId)
+    supabase.from('elements').delete().eq('board_id', id).eq('user_id', userId)
+    supabase.from('boards').delete().eq('id', id).eq('user_id', userId)
   }
 }
 
 // ── Elements ─────────────────────────────────────────────
 
 export async function getElements(boardId) {
-  const userId = await currentUserId()
+  const userId = currentUserId()
   const db = await getDB()
   if (userId) {
     const { data, error } = await supabase
@@ -112,7 +118,6 @@ export async function getElements(boardId) {
       .eq('user_id', userId)
     if (!error && data) {
       const elements = data.map(fromSupabaseElement)
-      // Populate IndexedDB cache for offline use
       const tx = db.transaction('elements', 'readwrite')
       for (const el of elements) await tx.objectStore('elements').put(el)
       await tx.done
@@ -126,19 +131,16 @@ export async function saveElement(el, { skipRemote = false } = {}) {
   const db = await getDB()
   await db.put('elements', el)
   if (!skipRemote) {
-    currentUserId().then(userId => {
-      if (userId) supabase.from('elements').upsert(toSupabaseElement(el, userId))
-    })
+    const userId = currentUserId()
+    if (userId) supabase.from('elements').upsert(toSupabaseElement(el, userId))
   }
 }
 
 export async function deleteElement(id) {
   const db = await getDB()
   await db.delete('elements', id)
-  // Supabase sync in background — don't block UI
-  currentUserId().then(userId => {
-    if (userId) supabase.from('elements').delete().eq('id', id).eq('user_id', userId)
-  })
+  const userId = currentUserId()
+  if (userId) supabase.from('elements').delete().eq('id', id).eq('user_id', userId)
 }
 
 // ── Shape converters ──────────────────────────────────────

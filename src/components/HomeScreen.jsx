@@ -7,11 +7,14 @@ import DraggableCard from './DraggableCard'
 
 export default function HomeScreen({ onOpenBoard, session }) {
   const [boards, setBoards] = useState([])
+  const [selectedId, setSelectedId] = useState(null)
   const [showNew, setShowNew] = useState(false)
   const [newName, setNewName] = useState('')
   const [newPos, setNewPos] = useState({ x: 100, y: 100 })
   const scaleRef = useRef(1)
+  const boardsRef = useRef([])
 
+  useEffect(() => { boardsRef.current = boards }, [boards])
   useEffect(() => { load() }, [])
 
   async function load() {
@@ -22,26 +25,22 @@ export default function HomeScreen({ onOpenBoard, session }) {
   async function createBoard() {
     const name = newName.trim()
     if (!name) { alert('Please type a name first'); return }
-    try {
-      const board = {
-        id: uid(),
-        parentId: null,
-        name,
-        x: newPos.x,
-        y: newPos.y,
-        createdAt: Date.now()
-      }
-      await saveBoard(board)
-      setNewName('')
-      setShowNew(false)
-      await load()
-    } catch (e) {
-      alert('Error creating board: ' + e.message)
+    const board = {
+      id: uid(),
+      parentId: null,
+      name,
+      x: newPos.x,
+      y: newPos.y,
+      createdAt: Date.now()
     }
+    await saveBoard(board)
+    setBoards(prev => [...prev, board])
+    setNewName('')
+    setShowNew(false)
   }
 
   async function moveBoard(id, x, y) {
-    const board = boards.find(b => b.id === id)
+    const board = boardsRef.current.find(b => b.id === id)
     if (!board) return
     const updated = { ...board, x, y }
     await saveBoard(updated)
@@ -50,11 +49,13 @@ export default function HomeScreen({ onOpenBoard, session }) {
 
   async function removeBoard(id) {
     if (!confirm('Delete this board and everything in it?')) return
-    await deleteBoard(id)
-    await load()
+    setBoards(prev => prev.filter(b => b.id !== id))
+    setSelectedId(null)
+    deleteBoard(id) // fire and forget
   }
 
   function handleCanvasClick(pos) {
+    if (selectedId) { setSelectedId(null); return }
     setNewPos(pos)
     setShowNew(true)
   }
@@ -73,27 +74,35 @@ export default function HomeScreen({ onOpenBoard, session }) {
             x={board.x}
             y={board.y}
             scaleRef={scaleRef}
-            alwaysDraggable
+            selected={selectedId === board.id}
             onMove={(x, y) => moveBoard(board.id, x, y)}
-            onTap={() => onOpenBoard(board.id)}
+            onTap={() => {
+              if (selectedId === board.id) {
+                onOpenBoard(board.id)
+              } else {
+                setSelectedId(board.id)
+              }
+            }}
           >
-            <div className="board-icon-card">
+            <div className={`board-icon-card ${selectedId === board.id ? 'selected' : ''}`}>
               <div className="board-icon-emoji">📋</div>
               <div className="board-icon-name">{board.name}</div>
-              <button
-                className="card-delete-btn"
-                onPointerDown={e => e.stopPropagation()}
-                onClick={e => { e.stopPropagation(); removeBoard(board.id) }}
-              >×</button>
+              {selectedId === board.id && (
+                <button
+                  className="card-delete-btn"
+                  onPointerDown={e => e.stopPropagation()}
+                  onClick={e => { e.stopPropagation(); removeBoard(board.id) }}
+                >×</button>
+              )}
             </div>
           </DraggableCard>
         ))}
       </Canvas>
 
       <div className="bottom-bar home-bottom">
-        <button className="add-board-btn" onClick={() => { setNewPos({ x: 120, y: 120 }); setShowNew(true) }}>
+        <button className="add-board-btn" onClick={() => { setSelectedId(null); setNewPos({ x: 120, y: 120 }); setShowNew(true) }}>
           <span className="add-board-icon">⊕</span>
-          <span>Board</span>
+          <span>New Board</span>
         </button>
       </div>
 
