@@ -326,10 +326,10 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
       <header className="top-bar">
         <button className="back-btn" onClick={onBack}>‹</button>
         <span className="board-title">{board.name}</span>
-        <button className="paste-img-btn" onClick={pasteFromClipboard} title="Add screenshot">📷</button>
+        <button className="paste-img-btn" onClick={pasteFromClipboard} title="Add screenshot"><img src="/screenshot.png" alt="screenshot" style={{width:22,height:22,objectFit:"contain"}} /></button>
         <button className="backup-btn" onClick={handleExport} title="Exportar backup">⬇︎</button>
         <button className="backup-btn" onClick={() => importRef.current.click()} title="Restaurar backup">⬆︎</button>
-        <button className="home-btn" onClick={onHome}>⌂</button>
+        <button className="home-btn" onClick={onHome}><img src="/home.png" alt="home" style={{width:22,height:22,objectFit:"contain"}} /></button>
       </header>
 
       <Canvas onClick={pos => { setPendingPos(pos); setSelectedId(null); setEditingId(null) }} scaleRef={scaleRef}>
@@ -340,7 +340,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
             onTap={() => onOpenBoard(b.id)}
           >
             <div className="board-icon-card">
-              <div className="board-icon-emoji">📋</div>
+              <div className="board-color-dot" style={{ background: b.color || '#e8315a' }} />
               <div className="board-icon-name">{b.name}</div>
               <button className="card-delete-btn"
                 onPointerDown={e => e.stopPropagation()}
@@ -562,14 +562,14 @@ function LinkCard({ el, selected, editing, onUpdate, onDelete, onStopEdit, onEdi
             <input ref={ref} className="card-input" value={el.content.url || ''}
               onChange={e => onUpdate({ ...el.content, url: e.target.value })} placeholder="https://…" />
             <button className="paste-btn" onMouseDown={e => e.preventDefault()}
-              onClick={async () => { try { onUpdate({ ...el.content, url: await navigator.clipboard.readText() }) } catch {} }}>📋</button>
+              onClick={async () => { try { onUpdate({ ...el.content, url: await navigator.clipboard.readText() }) } catch {} }}><img src="/link.png" alt="paste" style={{width:18,height:18,objectFit:"contain"}} /></button>
           </div>
           <button className="btn-primary" style={{ marginTop: 6 }} onMouseDown={e => e.preventDefault()} onClick={onStopEdit}>Done</button>
         </div>
       ) : (
         <div className="card-link-display">
           {el.content.url
-            ? <a className="card-link-text" href={el.content.url} target="_blank" rel="noreferrer">🔗 {shortUrl(el.content.url)}</a>
+            ? <a className="card-link-text" href={el.content.url} target="_blank" rel="noreferrer"><img src="/link.png" alt="link" style={{width:14,height:14,objectFit:"contain",marginRight:4,verticalAlign:"middle"}} />{shortUrl(el.content.url)}</a>
             : <span className="placeholder">Tap to add link</span>}
         </div>
       )}

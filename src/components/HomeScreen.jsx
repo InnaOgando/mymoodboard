@@ -5,6 +5,12 @@ import { supabase } from '../supabase'
 import Canvas from './Canvas'
 import DraggableCard from './DraggableCard'
 
+const BOARD_COLORS = ['#e8315a', '#f4845f', '#f7c948', '#4caf82', '#4a90d9', '#9b6dd6', '#e91e8c', '#00bcd4']
+
+function randomColor() {
+  return BOARD_COLORS[Math.floor(Math.random() * BOARD_COLORS.length)]
+}
+
 export default function HomeScreen({ onOpenBoard, session }) {
   const [boards, setBoards] = useState([])
   const [selectedId, setSelectedId] = useState(null)
@@ -29,6 +35,7 @@ export default function HomeScreen({ onOpenBoard, session }) {
       id: uid(),
       parentId: null,
       name,
+      color: randomColor(),
       x: newPos.x,
       y: newPos.y,
       createdAt: Date.now()
@@ -47,11 +54,19 @@ export default function HomeScreen({ onOpenBoard, session }) {
     setBoards(prev => prev.map(b => b.id === id ? updated : b))
   }
 
+  async function changeBoardColor(id, color) {
+    const board = boardsRef.current.find(b => b.id === id)
+    if (!board) return
+    const updated = { ...board, color }
+    await saveBoard(updated)
+    setBoards(prev => prev.map(b => b.id === id ? updated : b))
+  }
+
   async function removeBoard(id) {
     if (!confirm('Delete this board and everything in it?')) return
     setBoards(prev => prev.filter(b => b.id !== id))
     setSelectedId(null)
-    deleteBoard(id) // fire and forget
+    deleteBoard(id)
   }
 
   function handleCanvasClick(pos) {
@@ -77,22 +92,23 @@ export default function HomeScreen({ onOpenBoard, session }) {
             selected={selectedId === board.id}
             onMove={(x, y) => moveBoard(board.id, x, y)}
             onTap={() => {
-              if (selectedId === board.id) {
-                onOpenBoard(board.id)
-              } else {
-                setSelectedId(board.id)
-              }
+              if (selectedId === board.id) onOpenBoard(board.id)
+              else setSelectedId(board.id)
             }}
           >
             <div className={`board-icon-card ${selectedId === board.id ? 'selected' : ''}`}>
-              <div className="board-icon-emoji">📋</div>
+              <div className="board-color-dot" style={{ background: board.color || '#e8315a' }} />
               <div className="board-icon-name">{board.name}</div>
               {selectedId === board.id && (
-                <button
-                  className="card-delete-btn"
-                  onPointerDown={e => e.stopPropagation()}
-                  onClick={e => { e.stopPropagation(); removeBoard(board.id) }}
-                >×</button>
+                <div className="board-selected-actions" onPointerDown={e => e.stopPropagation()}>
+                  <div className="board-color-swatches">
+                    {BOARD_COLORS.map(c => (
+                      <button key={c} className="board-swatch" style={{ background: c, outline: board.color === c ? '2px solid #fff' : 'none' }}
+                        onClick={e => { e.stopPropagation(); changeBoardColor(board.id, c) }} />
+                    ))}
+                  </div>
+                  <button className="card-delete-btn" onClick={e => { e.stopPropagation(); removeBoard(board.id) }}>×</button>
+                </div>
               )}
             </div>
           </DraggableCard>
@@ -111,13 +127,8 @@ export default function HomeScreen({ onOpenBoard, session }) {
           <div className="modal" onClick={e => e.stopPropagation()}>
             <h3>New Board</h3>
             <form onSubmit={e => { e.preventDefault(); createBoard() }}>
-              <input
-                autoFocus
-                className="text-input"
-                placeholder="Board name…"
-                value={newName}
-                onChange={e => setNewName(e.target.value)}
-              />
+              <input autoFocus className="text-input" placeholder="Board name…"
+                value={newName} onChange={e => setNewName(e.target.value)} />
               <div className="modal-actions" style={{ marginTop: '12px' }}>
                 <button type="button" className="btn-ghost" onClick={() => setShowNew(false)}>Cancel</button>
                 <button type="submit" className="btn-primary">Create</button>

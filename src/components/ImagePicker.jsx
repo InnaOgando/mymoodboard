@@ -18,7 +18,7 @@ export default function ImagePicker({ onFiles, onClose }) {
 
         <div className="image-picker-options">
           <button className="picker-option" onClick={() => fileRef.current.click()}>
-            <span className="picker-icon">📷</span>
+            <img src="/image.png" alt="Photos" style={{width:24,height:24,objectFit:"contain"}} />
             <span>Photos / Camera</span>
           </button>
 

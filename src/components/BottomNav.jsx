@@ -1,13 +1,13 @@
 export default function BottomNav({ onAction }) {
   const left = [
-    { type: 'text', icon: 'T', label: 'Text' },
-    { type: 'link', icon: '🔗', label: 'Link' },
-    { type: 'color', icon: '🎨', label: 'Color' },
+    { type: 'text',  icon: '/text.png',  label: 'Text' },
+    { type: 'link',  icon: '/link.png',  label: 'Link' },
+    { type: 'color', icon: '/color.png', label: 'Color' },
   ]
   const right = [
-    { type: 'todo', icon: '☑️', label: 'To Do' },
-    { type: 'image', icon: '🖼️', label: 'Image' },
-    { type: 'document', icon: '📄', label: 'Doc' },
+    { type: 'todo',     icon: '/to-do.png', label: 'To Do' },
+    { type: 'image',    icon: '/image.png', label: 'Image' },
+    { type: 'document', icon: '/docs.png',  label: 'Doc' },
   ]
 
   return (
@@ -15,19 +15,19 @@ export default function BottomNav({ onAction }) {
       <div className="bottom-nav">
         {left.map(item => (
           <button key={item.type} className="nav-btn" onClick={() => onAction(item.type)}>
-            <span className="nav-icon">{item.icon}</span>
+            <img src={item.icon} alt={item.label} className="nav-icon-img" />
             <span className="nav-label">{item.label}</span>
           </button>
         ))}
 
         <button className="add-board-btn center-btn" onClick={() => onAction('board')}>
-          <span className="add-board-icon">⊕</span>
+          <img src="/collection.png" alt="Board" className="nav-icon-img" />
           <span>Board</span>
         </button>
 
         {right.map(item => (
           <button key={item.type} className="nav-btn" onClick={() => onAction(item.type)}>
-            <span className="nav-icon">{item.icon}</span>
+            <img src={item.icon} alt={item.label} className="nav-icon-img" />
             <span className="nav-label">{item.label}</span>
           </button>
         ))}
