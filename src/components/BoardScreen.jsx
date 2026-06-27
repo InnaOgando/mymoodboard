@@ -5,8 +5,9 @@ import Canvas from './Canvas'
 import DraggableCard from './DraggableCard'
 import BottomNav from './BottomNav'
 import ImagePicker from './ImagePicker'
+import ObjectRenderer, { normalizeType } from './ObjectRenderer'
+import { getCollectionItems } from './objects/CollectionObject'
 import { processAndUpload, deleteImageIfOrphaned } from '../storage.js'
-import { useLazyImage } from '../ImageImportService.js'
 
 export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, onHome }) {
   const [board, setBoard] = useState(null)
@@ -17,7 +18,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
   const [showImagePicker, setShowImagePicker] = useState(false)
   const [pendingPos, setPendingPos] = useState({ x: 100, y: 100 })
   const [columnTarget, setColumnTarget] = useState(null)
-  const [dropOverColumnId, setDropOverColumnId] = useState(null)
+  const [dropOverCollectionId, setDropOverCollectionId] = useState(null)
   const [undoStack, setUndoStack] = useState([])
   const [undoVisible, setUndoVisible] = useState(false)
   const undoTimer = useRef(null)
@@ -25,7 +26,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
   const scaleRef = useRef(1)
   const fileRef = useRef()
   const docRef = useRef()
-  const columnFileRef = useRef()
+  const collectionFileRef = useRef()
   const importRef = useRef()
 
   useEffect(() => { elementsRef.current = elements }, [elements])
@@ -72,7 +73,8 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
     }
     await saveElement(el, { skipRemote })
     setElements(prev => [...prev, el])
-    if (['note', 'text', 'link', 'todo'].includes(type)) setEditingId(el.id)
+    const editableTypes = ['idea', 'text', 'note', 'link', 'todo']
+    if (editableTypes.includes(type)) setEditingId(el.id)
     return el
   }
 
@@ -125,65 +127,73 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
     if (el) await saveElement({ ...el, w, h })
   }
 
-  async function colorElement(id, color) {
-    setElements(prev => prev.map(el => el.id === id ? { ...el, content: { ...el.content, bgColor: color } } : el))
-    const el = elementsRef.current.find(e => e.id === id)
-    if (el) await saveElement({ ...el, content: { ...el.content, bgColor: color } })
-  }
+  // ── Collection operations ───────────────────────────────────────────────────
 
-  async function makeColumn(imageEl) {
+  // Convert any canvas object into a new Collection containing just that object
+  async function makeCollection(objectEl) {
     try {
-      await deleteElement(imageEl.id)
+      await deleteElement(objectEl.id)
+      const items = [{ id: uid(), type: objectEl.type, content: objectEl.content, w: objectEl.w, h: objectEl.h }]
       const col = {
-        id: uid(), boardId, type: 'column',
-        x: imageEl.x, y: imageEl.y,
-        w: imageEl.w || 150,
-        content: { images: [{ id: uid(), src: imageEl.content.src }] },
+        id: uid(), boardId, type: 'collection',
+        x: objectEl.x, y: objectEl.y,
+        w: objectEl.w || 150,
+        content: { items },
         createdAt: Date.now()
       }
       await saveElement(col)
-      setElements(prev => [...prev.filter(e => e.id !== imageEl.id), col])
+      setElements(prev => [...prev.filter(e => e.id !== objectEl.id), col])
       setSelectedId(null)
-    } catch (err) { console.error('makeColumn failed', err) }
+    } catch (err) { console.error('makeCollection failed', err) }
   }
 
-  async function addImageToColumn(colId, src) {
+  // Add an image (by src URL) to a collection
+  async function addImageToCollection(colId, src) {
     const col = elementsRef.current.find(e => e.id === colId)
     if (!col) return
-    const updated = { ...col, content: { ...col.content, images: [...(col.content.images || []), { id: uid(), src }] } }
+    const items = getCollectionItems(col.content)
+    const newItem = { id: uid(), type: 'image', content: { src } }
+    const updated = { ...col, content: { ...col.content, items: [...items, newItem] } }
     await saveElement(updated)
     setElements(prev => prev.map(e => e.id === colId ? updated : e))
   }
 
-  async function ejectImageFromColumn(colId, imgId) {
+  // Eject any item from a collection back onto the canvas
+  async function ejectFromCollection(colId, itemId) {
     const col = elementsRef.current.find(e => e.id === colId)
     if (!col) return
-    const img = (col.content.images || []).find(i => i.id === imgId)
-    if (!img) return
-    const images = col.content.images.filter(i => i.id !== imgId)
+    const items = getCollectionItems(col.content)
+    const item = items.find(i => i.id === itemId)
+    if (!item) return
+    const remaining = items.filter(i => i.id !== itemId)
     const ejected = {
-      id: uid(), boardId, type: 'image',
+      id: uid(), boardId, type: item.type,
       x: col.x + (col.w || 150) + 24, y: col.y,
-      w: col.w || 150,
-      content: { src: img.src }, createdAt: Date.now()
+      w: item.w || 150,
+      h: item.h,
+      content: item.content,
+      createdAt: Date.now()
     }
     await saveElement(ejected)
-    if (images.length === 0) {
+    if (remaining.length === 0) {
       await deleteElement(colId)
       setElements(prev => prev.filter(e => e.id !== colId).concat(ejected))
     } else {
-      const updated = { ...col, content: { ...col.content, images } }
+      const updated = { ...col, content: { items: remaining } }
       await saveElement(updated)
       setElements(prev => prev.map(e => e.id === colId ? updated : e).concat(ejected))
     }
     setSelectedId(ejected.id)
   }
 
-  function hitTestColumn(cx, cy) {
-    const cols = elementsRef.current.filter(e => e.type === 'column')
+  // ── Drag & Drop (canvas ↔ collection) ──────────────────────────────────────
+
+  function hitTestCollection(cx, cy) {
+    const cols = elementsRef.current.filter(e => e.type === 'collection' || e.type === 'column')
     for (const col of cols) {
+      const items = getCollectionItems(col.content)
       const colW = (col.w || 150) + 40
-      const colH = (col.content.images || []).length * 170 + 80
+      const colH = Math.max(items.length * 170, 60) + 80
       if (cx >= col.x - 20 && cx <= col.x + colW && cy >= col.y - 20 && cy <= col.y + colH) {
         return col.id
       }
@@ -191,30 +201,34 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
     return null
   }
 
-  function handleImageDragMove(imageEl, nx, ny) {
-    const cx = nx + (imageEl.w || 150) / 2
+  function handleObjectDragMove(objectEl, nx, ny) {
+    // Don't allow dropping a collection into another collection
+    if (normalizeType(objectEl.type) === 'collection') return
+    const cx = nx + (objectEl.w || 150) / 2
     const cy = ny + 80
-    setDropOverColumnId(hitTestColumn(cx, cy))
+    const colId = hitTestCollection(cx, cy)
+    // Don't highlight if hovering over self (for collection elements)
+    setDropOverCollectionId(colId !== objectEl.id ? colId : null)
   }
 
-  async function handleImageDragEnd(imageEl, nx, ny) {
-    setDropOverColumnId(null)
-    const cx = nx + (imageEl.w || 150) / 2
+  async function handleObjectDragEnd(objectEl, nx, ny) {
+    setDropOverCollectionId(null)
+    if (normalizeType(objectEl.type) === 'collection') return
+    const cx = nx + (objectEl.w || 150) / 2
     const cy = ny + 80
-    const colId = hitTestColumn(cx, cy)
-    if (!colId) return
+    const colId = hitTestCollection(cx, cy)
+    if (!colId || colId === objectEl.id) return
     const col = elementsRef.current.find(e => e.id === colId)
     if (!col) return
-    try {
-      const updated = {
-        ...col,
-        content: { ...col.content, images: [...(col.content.images || []), { id: uid(), src: imageEl.content.src }] }
-      }
-      await saveElement(updated)
-      await deleteElement(imageEl.id)
-      setElements(prev => prev.filter(e => e.id !== imageEl.id).map(e => e.id === colId ? updated : e))
-      setSelectedId(colId)
-    } catch (err) { console.error('drop into column failed', err) }
+
+    const items = getCollectionItems(col.content)
+    const newItem = { id: uid(), type: objectEl.type, content: objectEl.content, w: objectEl.w, h: objectEl.h }
+    const updated = { ...col, content: { items: [...items, newItem] } }
+
+    await saveElement(updated)
+    await deleteElement(objectEl.id)
+    setElements(prev => prev.filter(e => e.id !== objectEl.id).map(e => e.id === colId ? updated : e))
+    setSelectedId(colId)
   }
 
   async function removeChildBoard(id) {
@@ -232,19 +246,21 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
       if (!name) return
       const newBoard = {
         id: uid(), parentId: boardId, name: name.trim(),
+        color: '#e8315a',
         x: pendingPos.x, y: pendingPos.y, createdAt: Date.now()
       }
       await saveBoard(newBoard)
       setChildBoards(prev => [...prev, newBoard])
     } else if (type === 'document') {
       docRef.current.click()
-    } else if (type === 'color') {
-      await addElement('color', pendingPos, { color: '#e8315a' })
+    } else if (type === 'palette') {
+      await addElement('palette', pendingPos, {
+        colors: ['#e8315a', '#f4845f', '#f7c948', '#4caf82', '#4a90d9']
+      })
     } else {
       await addElement(type, pendingPos)
     }
   }
-
 
   async function handleFiles(files) {
     const imgs = Array.from(files).filter(f => f.type.startsWith('image/'))
@@ -269,7 +285,6 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
   async function pasteFromClipboard() {
     const internal = sessionStorage.getItem('refmemo_copied_image')
     if (internal) { addElement('image', pendingPos, { src: internal }); return }
-    // On HTTPS: try clipboard API (reads screenshot without going through Photos)
     if (location.protocol === 'https:' && navigator.clipboard?.read) {
       try {
         const items = await navigator.clipboard.read()
@@ -286,15 +301,12 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
             return
           }
         }
-        // No image in clipboard
         fileRef.current.click()
       } catch {
-        // Permission denied — fall back to file picker
         fileRef.current.click()
       }
       return
     }
-    // HTTP local: file picker only
     fileRef.current.click()
   }
 
@@ -328,13 +340,19 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
       <header className="top-bar">
         <button className="back-btn" onClick={onBack}>‹</button>
         <span className="board-title">{board.name}</span>
-        <button className="paste-img-btn" onClick={pasteFromClipboard} title="Add screenshot"><img src="/screenshot.png" alt="screenshot" style={{width:22,height:22,objectFit:"contain"}} /></button>
+        <button className="paste-img-btn" onClick={pasteFromClipboard} title="Add screenshot">
+          <img src="/screenshot.png" alt="screenshot" style={{ width: 22, height: 22, objectFit: 'contain' }} />
+        </button>
         <button className="backup-btn" onClick={handleExport} title="Exportar backup">⬇︎</button>
         <button className="backup-btn" onClick={() => importRef.current.click()} title="Restaurar backup">⬆︎</button>
-        <button className="home-btn" onClick={onHome}><img src="/home.png" alt="home" style={{width:22,height:22,objectFit:"contain"}} /></button>
+        <button className="home-btn" onClick={onHome}>
+          <img src="/home.png" alt="home" style={{ width: 22, height: 22, objectFit: 'contain' }} />
+        </button>
       </header>
 
       <Canvas onClick={pos => { setPendingPos(pos); setSelectedId(null); setEditingId(null) }} scaleRef={scaleRef}>
+
+        {/* Child boards */}
         {childBoards.map(b => (
           <DraggableCard key={b.id} x={b.x} y={b.y} scaleRef={scaleRef}
             alwaysDraggable
@@ -351,23 +369,25 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
           </DraggableCard>
         ))}
 
+        {/* Canvas objects */}
         {elements.map(el => (
           <DraggableCard key={el.id} x={el.x} y={el.y} scaleRef={scaleRef}
             selected={selectedId === el.id}
             onMove={(x, y) => moveElement(el.id, x, y)}
-            onDragMove={el.type === 'image' ? (nx, ny) => handleImageDragMove(el, nx, ny) : undefined}
-            onDragEnd={el.type === 'image' ? (nx, ny) => handleImageDragEnd(el, nx, ny) : undefined}
+            onDragMove={(nx, ny) => handleObjectDragMove(el, nx, ny)}
+            onDragEnd={(nx, ny) => handleObjectDragEnd(el, nx, ny)}
             onTap={() => {
               if (selectedId === el.id) {
-                if (el.type === 'link' && el.content.url) window.open(el.content.url, '_blank')
-                else if (['color', 'text', 'note', 'todo', 'link'].includes(el.type)) setEditingId(el.id)
+                const type = normalizeType(el.type)
+                if (type === 'link' && el.content.url) window.open(el.content.url, '_blank')
+                else if (['idea', 'text', 'note', 'link', 'todo', 'palette'].includes(type)) setEditingId(el.id)
               } else {
                 setSelectedId(el.id)
                 setEditingId(null)
               }
             }}
           >
-            <ElementCard
+            <ObjectRenderer
               el={el}
               selected={selectedId === el.id}
               editing={editingId === el.id}
@@ -376,11 +396,10 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
               onStopEdit={() => setEditingId(null)}
               onEdit={() => setEditingId(el.id)}
               onResize={(w, h) => resizeElement(el.id, w, h)}
-              onColor={color => colorElement(el.id, color)}
-              onMakeColumn={() => makeColumn(el)}
-              onAddColumnImage={() => { setColumnTarget(el.id); columnFileRef.current.click() }}
-              onRemoveColumnImage={imgId => ejectImageFromColumn(el.id, imgId)}
-              isDropTarget={dropOverColumnId === el.id}
+              onMakeCollection={() => makeCollection(el)}
+              onAddImage={() => { setColumnTarget(el.id); collectionFileRef.current.click() }}
+              onEjectItem={itemId => ejectFromCollection(el.id, itemId)}
+              isDropTarget={dropOverCollectionId === el.id}
               scaleRef={scaleRef}
             />
           </DraggableCard>
@@ -389,11 +408,12 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
 
       <BottomNav onAction={handleNavAction} setPendingPos={setPendingPos} />
 
+      {/* Hidden file inputs */}
       <input ref={fileRef} type="file" accept="image/*" multiple style={{ display: 'none' }}
         onChange={e => { handleFiles(Array.from(e.target.files)); e.target.value = '' }} />
       <input ref={docRef} type="file" accept=".pdf,.doc,.docx" multiple style={{ display: 'none' }}
         onChange={e => { handleFiles(Array.from(e.target.files)); e.target.value = '' }} />
-      <input ref={columnFileRef} type="file" accept="image/*" multiple style={{ display: 'none' }}
+      <input ref={collectionFileRef} type="file" accept="image/*" multiple style={{ display: 'none' }}
         onChange={async e => {
           const colId = columnTarget
           if (!colId) return
@@ -401,15 +421,14 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
           for (const file of Array.from(e.target.files)) {
             try {
               const meta = await processAndUpload(file)
-              await addImageToColumn(colId, meta.src)
+              await addImageToCollection(colId, meta.src)
             } catch (err) {
-              console.warn('[columnFileRef] processAndUpload failed:', err)
+              console.warn('[collectionFileRef] processAndUpload failed:', err)
             }
           }
           e.target.value = ''
         }} />
-      <input ref={importRef} type="file" accept=".json" style={{ display: 'none' }}
-        onChange={handleImport} />
+      <input ref={importRef} type="file" accept=".json" style={{ display: 'none' }} onChange={handleImport} />
 
       {showImagePicker && (
         <ImagePicker
@@ -426,251 +445,6 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
         </div>
       )}
     </div>
-  )
-}
-
-// ── Cards ─────────────────────────────────────────────────────────────────────
-
-function ElementCard({ el, selected, editing, onUpdate, onDelete, onStopEdit, onEdit, onResize, onColor, onMakeColumn, onAddColumnImage, onRemoveColumnImage, isDropTarget, scaleRef }) {
-  const props = { el, selected, editing, onUpdate, onDelete, onStopEdit, onEdit, onResize, onColor, onMakeColumn, onAddColumnImage, onRemoveColumnImage, isDropTarget, scaleRef }
-  switch (el.type) {
-    case 'image':    return <ImageCard {...props} />
-    case 'column':   return <ColumnCard {...props} />
-    case 'color':    return <ColorCard {...props} />
-    case 'text':
-    case 'note':     return <TextCard {...props} />
-    case 'link':     return <LinkCard {...props} />
-    case 'todo':     return <TodoCard {...props} />
-    case 'document': return <DocumentCard {...props} />
-    default: return null
-  }
-}
-
-function ImageCard({ el, selected, onDelete, onResize, onMakeColumn, scaleRef }) {
-  const w = el.w || 150
-  const { ref, loaded, visibleSrc, placeholderSrc } = useLazyImage(el.content.src)
-
-  return (
-    <div style={{ position: 'relative', width: w }}>
-      {selected && (
-        <div className="img-popup-menu" onPointerDown={e => e.stopPropagation()}>
-          <button className="img-popup-btn" onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onMakeColumn?.() }}>+ Column</button>
-          <button className="img-popup-btn img-popup-delete" onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onDelete() }}>×</button>
-        </div>
-      )}
-      <div ref={ref} className={`el-card el-image ${selected ? 'selected' : ''}`} style={{ width: w, position: 'relative', minHeight: 60 }}>
-        {!loaded && (
-          <div style={{ width: '100%', minHeight: 80, background: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{ width: 20, height: 20, border: '2px solid #ccc', borderTopColor: '#888', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-          </div>
-        )}
-        {visibleSrc && (
-          <img
-            src={visibleSrc}
-            alt=""
-            draggable={false}
-            style={{ width: '100%', height: 'auto', display: 'block', opacity: loaded ? 1 : 0, transition: 'opacity 0.3s ease' }}
-          />
-        )}
-        {!visibleSrc && !loaded && (
-          <img src={placeholderSrc} alt="" draggable={false} style={{ width: '100%', height: 'auto', display: 'block' }} />
-        )}
-        {selected && <ResizeHandle w={w} h={null} onResize={nw => onResize(nw, null)} minW={60} scaleRef={scaleRef} />}
-      </div>
-    </div>
-  )
-}
-
-function hexToRgb(hex) {
-  const r = parseInt(hex.slice(1, 3), 16)
-  const g = parseInt(hex.slice(3, 5), 16)
-  const b = parseInt(hex.slice(5, 7), 16)
-  return { r, g, b }
-}
-
-function ColorCard({ el, selected, onUpdate, onDelete }) {
-  const color = el.content.color || '#e8315a'
-  const { r, g, b } = hexToRgb(color)
-  const isDark = (r * 299 + g * 587 + b * 114) / 1000 < 128
-  const textColor = isDark ? '#fff' : '#111'
-  return (
-    <div className={`el-card el-color-card ${selected ? 'selected' : ''}`} style={{ background: color }}>
-      <div className="color-card-row">
-        <input type="color" value={color} className="color-card-input-native"
-          onChange={e => onUpdate({ ...el.content, color: e.target.value })} />
-        <div className="color-card-codes" style={{ color: textColor }}>
-          <div className="color-code-row"><span className="color-code-label">HEX</span><span className="color-code-val">{color.toUpperCase()}</span></div>
-          <div className="color-code-row"><span className="color-code-label">RGB</span><span className="color-code-val">{r}, {g}, {b}</span></div>
-        </div>
-        {selected && <button className="color-card-del" onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onDelete() }}>×</button>}
-      </div>
-    </div>
-  )
-}
-
-function ColumnCard({ el, selected, isDropTarget, onDelete, onResize, onAddColumnImage, onRemoveColumnImage, scaleRef }) {
-  const w = el.w || 150
-  const images = el.content.images || []
-  return (
-    <div className={`el-card el-column ${selected ? 'selected' : ''} ${isDropTarget ? 'drop-target' : ''}`} style={{ width: w }}>
-      <div className="drag-handle">
-        <span className="handle-dots">⠿</span>
-        <span className="column-label">Column</span>
-        {selected && <>
-          <button className="img-action-btn col-add-btn" onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onAddColumnImage?.() }}>+ Add</button>
-          <button className="handle-delete" onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onDelete() }}>×</button>
-        </>}
-      </div>
-      <div className="column-images">
-        {images.map(img => (
-          <div key={img.id} className="column-img-wrap">
-            <img src={img.src} alt="" draggable={false} style={{ width: '100%', display: 'block' }} />
-            {selected && (
-              <button className="col-img-eject" onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onRemoveColumnImage?.(img.id) }}>↗</button>
-            )}
-          </div>
-        ))}
-      </div>
-      {selected && <ResizeHandle w={w} h={null} onResize={nw => onResize(nw, null)} minW={80} scaleRef={scaleRef} />}
-    </div>
-  )
-}
-
-function TextCard({ el, selected, editing, onUpdate, onDelete, onResize, scaleRef }) {
-  const ref = useRef()
-  const w = el.w || 220
-  const h = el.h || 120
-  useEffect(() => { if (editing) setTimeout(() => ref.current?.focus(), 50) }, [editing])
-  return (
-    <div className={`el-card el-text ${selected ? 'selected' : ''}`} style={{ width: w, height: h }}>
-      <div className="drag-handle">
-        <span className="handle-dots">⠿</span>
-        {selected && <button className="handle-delete" onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onDelete() }}>×</button>}
-      </div>
-      <textarea ref={ref} className="card-textarea card-textarea-text"
-        style={{ fontSize: `${el.content.fontSize || 18}px`, height: h - 28 }}
-        value={el.content.text || ''}
-        onChange={e => onUpdate({ ...el.content, text: e.target.value })}
-        placeholder="Tap to type…" />
-      {selected && <ResizeHandle w={w} h={h} onResize={onResize} minW={120} minH={60} scaleRef={scaleRef} />}
-    </div>
-  )
-}
-
-function LinkCard({ el, selected, editing, onUpdate, onDelete, onStopEdit, onEdit, onResize, scaleRef }) {
-  const ref = useRef()
-  const w = el.w || 260
-  useEffect(() => { if (editing) setTimeout(() => ref.current?.focus(), 50) }, [editing])
-  return (
-    <div className={`el-card el-link ${selected ? 'selected' : ''}`} style={{ width: w }}>
-      <div className="drag-handle">
-        <span className="handle-dots">⠿</span>
-        {selected && <button className="handle-edit" onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onEdit?.() }}>✎</button>}
-        {selected && <button className="handle-delete" onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onDelete() }}>×</button>}
-      </div>
-      {editing ? (
-        <div className="link-edit-col">
-          <div className="link-edit-row">
-            <input ref={ref} className="card-input" value={el.content.url || ''}
-              onChange={e => onUpdate({ ...el.content, url: e.target.value })} placeholder="https://…" />
-            <button className="paste-btn" onMouseDown={e => e.preventDefault()}
-              onClick={async () => { try { onUpdate({ ...el.content, url: await navigator.clipboard.readText() }) } catch {} }}><img src="/link.png" alt="paste" style={{width:18,height:18,objectFit:"contain"}} /></button>
-          </div>
-          <button className="btn-primary" style={{ marginTop: 6 }} onMouseDown={e => e.preventDefault()} onClick={onStopEdit}>Done</button>
-        </div>
-      ) : (
-        <div className="card-link-display">
-          {el.content.url
-            ? <a className="card-link-text" href={el.content.url} target="_blank" rel="noreferrer"><img src="/link.png" alt="link" style={{width:14,height:14,objectFit:"contain",marginRight:4,verticalAlign:"middle"}} />{shortUrl(el.content.url)}</a>
-            : <span className="placeholder">Tap to add link</span>}
-        </div>
-      )}
-      {selected && <ResizeHandle w={w} h={null} onResize={nw => onResize(nw, null)} minW={160} scaleRef={scaleRef} />}
-    </div>
-  )
-}
-
-function shortUrl(url) {
-  try {
-    const u = new URL(url)
-    const p = u.pathname.length > 20 ? u.pathname.slice(0, 20) + '…' : u.pathname
-    return u.hostname.replace('www.', '') + p
-  } catch { return url.length > 40 ? url.slice(0, 40) + '…' : url }
-}
-
-function TodoCard({ el, selected, editing, onUpdate, onDelete, onResize, scaleRef }) {
-  const items = el.content.items?.length ? el.content.items : [{ text: '', done: false }]
-  const w = el.w || 260
-  function toggle(i) { onUpdate({ ...el.content, items: items.map((t, idx) => idx !== i ? t : { ...t, done: !t.done }) }) }
-  function updateItem(i, text) { onUpdate({ ...el.content, items: items.map((t, idx) => idx !== i ? t : { ...t, text }) }) }
-  function addItem() { onUpdate({ ...el.content, items: [...items, { text: '', done: false }] }) }
-  function removeItem(i) { const u = items.filter((_, idx) => idx !== i); onUpdate({ ...el.content, items: u.length ? u : [{ text: '', done: false }] }) }
-  return (
-    <div className={`el-card el-todo ${selected ? 'selected' : ''}`} style={{ width: w }}>
-      <div className="drag-handle">
-        <span className="handle-dots">⠿</span>
-        {selected && <button className="handle-delete" onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onDelete() }}>×</button>}
-      </div>
-      {items.map((item, i) => (
-        <div key={i} className="todo-item">
-          <input type="checkbox" checked={!!item.done} onChange={() => toggle(i)} />
-          <input className={`todo-input ${item.done ? 'done' : ''}`} value={item.text || ''}
-            onChange={e => updateItem(i, e.target.value)} placeholder="Task…" />
-          {editing && <button className="todo-remove" onClick={() => removeItem(i)}>×</button>}
-        </div>
-      ))}
-      <button className="todo-add" onClick={addItem}>+ Add item</button>
-      {selected && <ResizeHandle w={w} h={null} onResize={nw => onResize(nw, null)} minW={160} scaleRef={scaleRef} />}
-    </div>
-  )
-}
-
-function DocumentCard({ el, selected, onDelete }) {
-  function openDoc(e) {
-    e.stopPropagation()
-    if (!el.content.src) return
-    const byteStr = atob(el.content.src.split(',')[1])
-    const ab = new ArrayBuffer(byteStr.length)
-    const ia = new Uint8Array(ab)
-    for (let i = 0; i < byteStr.length; i++) ia[i] = byteStr.charCodeAt(i)
-    const blob = new Blob([ab], { type: el.content.type || 'application/octet-stream' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url; a.target = '_blank'; a.rel = 'noreferrer'
-    document.body.appendChild(a); a.click(); document.body.removeChild(a)
-    setTimeout(() => URL.revokeObjectURL(url), 10000)
-  }
-  return (
-    <div className={`el-card el-document ${selected ? 'selected' : ''}`}>
-      <div className="drag-handle">
-        <span className="handle-dots">⠿</span>
-        {selected && <button className="handle-delete" onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onDelete() }}>×</button>}
-      </div>
-      <div className="doc-icon">{el.content.type === 'application/pdf' ? '📄' : '📝'}</div>
-      <div className="doc-name">{el.content.name}</div>
-      {el.content.src && <button className="doc-open" onPointerDown={e => e.stopPropagation()} onClick={openDoc}>Open</button>}
-    </div>
-  )
-}
-
-function ResizeHandle({ w, h, onResize, minW = 80, minH = 60, scaleRef }) {
-  const startPtr = useRef(null)
-  return (
-    <div className="resize-handle"
-      onPointerDown={e => {
-        e.stopPropagation(); e.preventDefault()
-        startPtr.current = { x: e.clientX, y: e.clientY, w, h }
-        e.currentTarget.setPointerCapture(e.pointerId)
-      }}
-      onPointerMove={e => {
-        if (!startPtr.current) return
-        const s = scaleRef?.current ?? 1
-        const nw = Math.max(minW, (startPtr.current.w || 150) + (e.clientX - startPtr.current.x) / s)
-        const nh = h !== null ? Math.max(minH, (startPtr.current.h || 120) + (e.clientY - startPtr.current.y) / s) : null
-        onResize(nw, nh)
-      }}
-      onPointerUp={() => { startPtr.current = null }}
-    />
   )
 }
 

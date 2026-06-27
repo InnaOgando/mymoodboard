@@ -1,8 +1,8 @@
 export default function BottomNav({ onAction }) {
   const left = [
-    { type: 'text',  icon: '/text.png',  label: 'Text' },
-    { type: 'link',  icon: '/link.png',  label: 'Link' },
-    { type: 'color', icon: '/color.png', label: 'Color' },
+    { type: 'idea',    icon: '/text.png',  label: 'Idea' },
+    { type: 'link',    icon: '/link.png',  label: 'Link' },
+    { type: 'palette', icon: '/color.png', label: 'Palette' },
   ]
   const right = [
     { type: 'todo',     icon: '/to-do.png', label: 'To Do' },

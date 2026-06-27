@@ -1,0 +1,32 @@
+export default function DocumentObject({ el, selected, onDelete }) {
+  function openDoc(e) {
+    e.stopPropagation()
+    if (!el.content.src) return
+    const byteStr = atob(el.content.src.split(',')[1])
+    const ab = new ArrayBuffer(byteStr.length)
+    const ia = new Uint8Array(ab)
+    for (let i = 0; i < byteStr.length; i++) ia[i] = byteStr.charCodeAt(i)
+    const blob = new Blob([ab], { type: el.content.type || 'application/octet-stream' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.target = '_blank'; a.rel = 'noreferrer'
+    document.body.appendChild(a); a.click(); document.body.removeChild(a)
+    setTimeout(() => URL.revokeObjectURL(url), 10000)
+  }
+
+  return (
+    <div className={`el-card el-document ${selected ? 'selected' : ''}`}>
+      <div className="drag-handle">
+        <span className="handle-dots">⠿</span>
+        {selected && (
+          <button className="handle-delete" onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onDelete() }}>×</button>
+        )}
+      </div>
+      <div className="doc-icon">{el.content.type === 'application/pdf' ? '📄' : '📝'}</div>
+      <div className="doc-name">{el.content.name}</div>
+      {el.content.src && (
+        <button className="doc-open" onPointerDown={e => e.stopPropagation()} onClick={openDoc}>Open</button>
+      )}
+    </div>
+  )
+}

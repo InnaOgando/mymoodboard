@@ -1,15 +1,20 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from './supabase'
 
-const MAX_PX = 512
-const TARGET_BYTES = 50 * 1024
-const QUALITIES = [0.82, 0.65, 0.5]
+const IMAGE_CONFIG = {
+  MAX_PX: 512,
+  TARGET_BYTES: 50 * 1024,
+  FORMAT: 'image/webp',
+  QUALITY_START: 0.75,
+  QUALITY_MIN: 0.55,
+  QUALITY_STEP: 0.05,
+}
 
 // ── 1. Image optimization pipeline ──────────────────────────────────────────
 
 /**
  * Optimize a File, Blob, or string (URL / base64 data URI) to a WebP blob
- * ≤512px longest side, targeting <50KB.
+ * ≤MAX_PX longest side, targeting <TARGET_BYTES using adaptive quality stepping.
  * @returns {{ blob: Blob, width: number, height: number, sizeBytes: number }}
  */
 export async function optimize(input) {
@@ -19,9 +24,9 @@ export async function optimize(input) {
 
   let w = origW
   let h = origH
-  if (Math.max(w, h) > MAX_PX) {
-    if (w >= h) { h = Math.round(h * MAX_PX / w); w = MAX_PX }
-    else        { w = Math.round(w * MAX_PX / h); h = MAX_PX }
+  if (Math.max(w, h) > IMAGE_CONFIG.MAX_PX) {
+    if (w >= h) { h = Math.round(h * IMAGE_CONFIG.MAX_PX / w); w = IMAGE_CONFIG.MAX_PX }
+    else        { w = Math.round(w * IMAGE_CONFIG.MAX_PX / h); h = IMAGE_CONFIG.MAX_PX }
   }
 
   const canvas = document.createElement('canvas')
@@ -29,16 +34,23 @@ export async function optimize(input) {
   canvas.height = h
   const ctx = canvas.getContext('2d')
   ctx.drawImage(bitmap, 0, 0, w, h)
-  bitmap.close() // free original pixels immediately
+  bitmap.close()
 
-  for (const quality of QUALITIES) {
-    const result = await _canvasToBlob(canvas, 'image/webp', quality)
-    if (result.size <= TARGET_BYTES || quality === QUALITIES[QUALITIES.length - 1]) {
-      canvas.width = 1  // release canvas memory
-      canvas.height = 1
-      return { blob: result, width: w, height: h, sizeBytes: result.size }
-    }
-  }
+  // Adaptive compression: step quality down until under TARGET_BYTES or QUALITY_MIN reached
+  const stepInt  = Math.round(IMAGE_CONFIG.QUALITY_STEP  * 100)
+  const minInt   = Math.round(IMAGE_CONFIG.QUALITY_MIN   * 100)
+  let qualityInt = Math.round(IMAGE_CONFIG.QUALITY_START * 100)
+  let result
+
+  do {
+    result = await _canvasToBlob(canvas, IMAGE_CONFIG.FORMAT, qualityInt / 100)
+    if (result.size <= IMAGE_CONFIG.TARGET_BYTES) break
+    qualityInt -= stepInt
+  } while (qualityInt >= minInt)
+
+  canvas.width = 1
+  canvas.height = 1
+  return { blob: result, width: w, height: h, sizeBytes: result.size }
 }
 
 async function _toBlob(input) {
@@ -52,7 +64,6 @@ async function _toBlob(input) {
       for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i)
       return new Blob([arr], { type: mime })
     }
-    // URL — fetch it
     const res = await fetch(input)
     return res.blob()
   }
@@ -93,7 +104,7 @@ async function _uploadWebp(blob, userId, hash) {
   const path = `${userId}/${hash}.webp`
   const { error } = await supabase.storage
     .from('images')
-    .upload(path, blob, { contentType: 'image/webp', upsert: false })
+    .upload(path, blob, { contentType: IMAGE_CONFIG.FORMAT, upsert: false })
 
   if (error && error.statusCode !== '409' && error.message && !error.message.includes('already exists')) {
     throw error
@@ -118,7 +129,6 @@ export async function processAndUpload(input) {
   const { blob, width, height, sizeBytes } = await optimize(input)
   const hash = await sha256Hex(blob)
 
-  // Check DB for existing reference
   const existingUrl = await _findExistingUrl(hash, userId)
   if (existingUrl) {
     return { src: existingUrl, hash, width, height, sizeBytes }
@@ -139,15 +149,13 @@ export async function deleteImageIfOrphaned(url, currentElementId) {
     const userId = session?.user?.id
     if (!userId) return
 
-    // Parse hash from path: .../images/userId/hash.webp
     const marker = '/object/public/images/'
     const idx = url.indexOf(marker)
     if (idx === -1) return
-    const pathPart = url.slice(idx + marker.length) // userId/hash.webp
-    const fileName = pathPart.split('/').pop()       // hash.webp
+    const pathPart = url.slice(idx + marker.length)
+    const fileName = pathPart.split('/').pop()
     const hash = fileName.replace(/\.webp$/, '')
 
-    // Count all elements referencing this hash (or URL) for this user
     const { data } = await supabase
       .from('elements')
       .select('id, content')
@@ -193,7 +201,7 @@ export function useLazyImage(src) {
     setLoaded(false)
     const img = new Image()
     img.onload = () => setLoaded(true)
-    img.onerror = () => setLoaded(true) // still remove placeholder on error
+    img.onerror = () => setLoaded(true)
     img.src = src
   }, [visible, src])
 
