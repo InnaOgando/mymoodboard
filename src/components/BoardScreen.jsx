@@ -5,8 +5,8 @@ import Canvas from './Canvas'
 import DraggableCard from './DraggableCard'
 import BottomNav from './BottomNav'
 import ImagePicker from './ImagePicker'
-import { compressImage } from '../compress.js'
-import { uploadImage, deleteImage } from '../storage.js'
+import { processAndUpload, deleteImageIfOrphaned } from '../storage.js'
+import { useLazyImage } from '../ImageImportService.js'
 
 export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, onHome }) {
   const [board, setBoard] = useState(null)
@@ -39,8 +39,12 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
       if (!imgItem) return
       e.preventDefault()
       const blob = imgItem.getAsFile()
-      const data = await compressImage(blob)
-      await addElement('image', pendingPos, { src: data })
+      try {
+        const meta = await processAndUpload(blob)
+        await addElement('image', pendingPos, meta)
+      } catch (err) {
+        console.warn('[paste] processAndUpload failed:', err)
+      }
     }
     document.addEventListener('paste', handlePaste)
     return () => document.removeEventListener('paste', handlePaste)
@@ -96,7 +100,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
     setSelectedId(null)
     await deleteElement(id)
     if (el?.type === 'image' && el.content?.src?.startsWith('http')) {
-      deleteImage(el.content.src)
+      deleteImageIfOrphaned(el.content.src, id)
     }
     if (el) {
       setUndoStack(prev => [...prev.slice(-19), el])
@@ -249,15 +253,12 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
       const col = i % 2
       const row = Math.floor(i / 2)
       const pos = { x: pendingPos.x + col * 162, y: pendingPos.y + row * 162 }
-      // Add immediately with base64, skip Supabase DB until we have the Storage URL
-      const data = await compressImage(imgs[i])
-      const el = await addElement('image', pos, { src: data }, { skipRemote: true })
-      // Upload to Storage in background, then save URL to Supabase DB
-      const file = imgs[i]
-      uploadImage(file).then(url => updateContent(el.id, { src: url })).catch(() => {
-        // Storage failed — sync base64 to Supabase DB as fallback
-        saveElement(elementsRef.current.find(e => e.id === el.id) || el)
-      })
+      try {
+        const meta = await processAndUpload(imgs[i])
+        await addElement('image', pos, meta)
+      } catch (err) {
+        console.warn('[handleFiles] processAndUpload failed:', err)
+      }
     }
     for (const f of docs) {
       const pos = { x: pendingPos.x + Math.random() * 40, y: pendingPos.y + Math.random() * 40 }
@@ -276,11 +277,12 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
           const imageType = item.types.find(t => t.startsWith('image/'))
           if (imageType) {
             const blob = await item.getType(imageType)
-            const data = await compressImage(blob)
-            const el = await addElement('image', pendingPos, { src: data }, { skipRemote: true })
-            uploadImage(blob).then(url => updateContent(el.id, { src: url })).catch(() => {
-              saveElement(elementsRef.current.find(e => e.id === el.id) || el)
-            })
+            try {
+              const meta = await processAndUpload(blob)
+              await addElement('image', pendingPos, meta)
+            } catch (err) {
+              console.warn('[pasteFromClipboard] processAndUpload failed:', err)
+            }
             return
           }
         }
@@ -397,18 +399,12 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
           if (!colId) return
           setColumnTarget(null)
           for (const file of Array.from(e.target.files)) {
-            const src = await compressImage(file)
-            await addImageToColumn(colId, src)
-            uploadImage(file).then(url => {
-              const col = elementsRef.current.find(c => c.id === colId)
-              if (!col) return
-              const imgs = (col.content.images || [])
-              const idx = imgs.findIndex(i => i.src === src)
-              if (idx === -1) return
-              const updated = { ...col, content: { ...col.content, images: imgs.map((i, n) => n === idx ? { ...i, src: url } : i) } }
-              saveElement(updated)
-              setElements(prev => prev.map(e => e.id === colId ? updated : e))
-            }).catch(() => {})
+            try {
+              const meta = await processAndUpload(file)
+              await addImageToColumn(colId, meta.src)
+            } catch (err) {
+              console.warn('[columnFileRef] processAndUpload failed:', err)
+            }
           }
           e.target.value = ''
         }} />
@@ -452,6 +448,7 @@ function ElementCard({ el, selected, editing, onUpdate, onDelete, onStopEdit, on
 
 function ImageCard({ el, selected, onDelete, onResize, onMakeColumn, scaleRef }) {
   const w = el.w || 150
+  const { ref, loaded, visibleSrc, placeholderSrc } = useLazyImage(el.content.src)
 
   return (
     <div style={{ position: 'relative', width: w }}>
@@ -461,8 +458,23 @@ function ImageCard({ el, selected, onDelete, onResize, onMakeColumn, scaleRef })
           <button className="img-popup-btn img-popup-delete" onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onDelete() }}>×</button>
         </div>
       )}
-      <div className={`el-card el-image ${selected ? 'selected' : ''}`} style={{ width: w }}>
-        <img src={el.content.src} alt="" draggable={false} style={{ width: '100%', height: 'auto', display: 'block' }} />
+      <div ref={ref} className={`el-card el-image ${selected ? 'selected' : ''}`} style={{ width: w, position: 'relative', minHeight: 60 }}>
+        {!loaded && (
+          <div style={{ width: '100%', minHeight: 80, background: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: 20, height: 20, border: '2px solid #ccc', borderTopColor: '#888', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+          </div>
+        )}
+        {visibleSrc && (
+          <img
+            src={visibleSrc}
+            alt=""
+            draggable={false}
+            style={{ width: '100%', height: 'auto', display: 'block', opacity: loaded ? 1 : 0, transition: 'opacity 0.3s ease' }}
+          />
+        )}
+        {!visibleSrc && !loaded && (
+          <img src={placeholderSrc} alt="" draggable={false} style={{ width: '100%', height: 'auto', display: 'block' }} />
+        )}
         {selected && <ResizeHandle w={w} h={null} onResize={nw => onResize(nw, null)} minW={60} scaleRef={scaleRef} />}
       </div>
     </div>
