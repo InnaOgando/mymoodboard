@@ -1,4 +1,5 @@
 import ResizeHandle from '../ResizeHandle'
+import SortableGrid from '../SortableGrid'
 import { getPaletteColors } from './PaletteObject'
 
 function normalizeType(type) {
@@ -23,17 +24,12 @@ function shortUrl(url) {
   } catch { return url.slice(0, 24) + '…' }
 }
 
+// Compact read-only thumbnail preview of any object type inside the collection
 function MiniObject({ item }) {
   const type = normalizeType(item.type)
   switch (type) {
     case 'image':
-      return (
-        <img
-          src={item.content.src}
-          alt=""
-          draggable={false}
-        />
-      )
+      return <img src={item.content.src} alt="" draggable={false} />
     case 'idea':
       return (
         <div className="mini-idea">
@@ -46,14 +42,8 @@ function MiniObject({ item }) {
         <div className="mini-link">
           <div className="mini-link-title">{item.content.title || shortUrl(item.content.url || '') || 'Link'}</div>
           {item.content.url && (
-            <a
-              className="mini-link-url"
-              href={item.content.url}
-              target="_blank"
-              rel="noreferrer"
-              onPointerDown={e => e.stopPropagation()}
-              onClick={e => e.stopPropagation()}
-            >
+            <a className="mini-link-url" href={item.content.url} target="_blank" rel="noreferrer"
+              onPointerDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
               {shortUrl(item.content.url)}
             </a>
           )}
@@ -83,9 +73,15 @@ function MiniObject({ item }) {
   }
 }
 
-export default function CollectionObject({ el, selected, isDropTarget, onDelete, onResize, onAddImage, onEjectItem, scaleRef }) {
-  const w = el.w || 150
+export default function CollectionObject({
+  el, selected, isDropTarget, onUpdate, onDelete, onResize, onAddImage, onEjectItem, scaleRef
+}) {
+  const w = el.w || 260
   const items = getCollectionItems(el.content)
+
+  function handleReorder(newItems) {
+    onUpdate?.({ ...el.content, items: newItems })
+  }
 
   return (
     <div style={{ position: 'relative', width: w }}>
@@ -104,32 +100,42 @@ export default function CollectionObject({ el, selected, isDropTarget, onDelete,
       >
         <div className="drag-handle">
           <span className="handle-dots">⠿</span>
-          <span className="column-label">Collection</span>
+          <span className="column-label">Collection{selected ? ' · drag to reorder' : ''}</span>
         </div>
 
-        <div className="collection-items">
-          {items.length === 0 && (
-            <div className="collection-empty">Drag objects here</div>
-          )}
-          {items.map(item => (
-            <div key={item.id} className="collection-item-wrap">
-              <MiniObject item={item} />
-              {selected && (
-                <button
-                  className="col-img-eject"
-                  onPointerDown={e => e.stopPropagation()}
-                  onClick={e => { e.stopPropagation(); onEjectItem?.(item.id) }}
-                  title="Move to canvas"
-                >
-                  ↗
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
+        {items.length === 0 ? (
+          <div className="collection-empty">Drag objects here</div>
+        ) : (
+          <SortableGrid
+            items={items}
+            cellSize={120}
+            gap={4}
+            padTop={6}
+            padRight={8}
+            padBottom={8}
+            padLeft={8}
+            disabled={!selected}
+            onReorder={handleReorder}
+            renderItem={(item, index, { isDragged }) => (
+              <div className="collection-item-wrap">
+                <MiniObject item={item} />
+                {selected && (
+                  <button
+                    className="col-img-eject"
+                    onPointerDown={e => e.stopPropagation()}
+                    onClick={e => { e.stopPropagation(); onEjectItem?.(item.id) }}
+                    title="Move to canvas"
+                  >
+                    ↗
+                  </button>
+                )}
+              </div>
+            )}
+          />
+        )}
 
         {selected && (
-          <ResizeHandle w={w} h={null} onResize={nw => onResize(nw, null)} minW={80} scaleRef={scaleRef} />
+          <ResizeHandle w={w} h={null} onResize={nw => onResize(nw, null)} minW={140} scaleRef={scaleRef} />
         )}
       </div>
     </div>

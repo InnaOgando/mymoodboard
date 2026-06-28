@@ -955,13 +955,8 @@ body {
   overflow: hidden;
 }
 
-/* Responsive gallery grid — thumbnails are fixed size, columns reflow by width */
-.collection-items {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, 120px);
-  gap: 4px;
-  padding: 6px 8px 8px;
-}
+/* .collection-items layout is now handled by SortableGrid (position: absolute items) */
+.collection-items { /* kept as selector hook for specificity — layout via SortableGrid */ }
 
 .collection-empty {
   padding: 20px 12px;
@@ -973,12 +968,11 @@ body {
 
 .collection-item-wrap {
   position: relative;
-  width: 120px;
-  height: 120px;
+  width: 100%;
+  height: 100%;
   overflow: hidden;
   border-radius: 4px;
   background: #f0f0f0;
-  flex-shrink: 0;
 }
 .collection-item-wrap img {
   width: 100%;
@@ -1129,43 +1123,47 @@ body {
   flex: 1;
   padding-left: 4px;
 }
-.palette-swatches {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 12px;
-  flex-wrap: wrap;
+/* Palette swatch grid — responsive via SortableGrid (same engine as Collection) */
+.palette-swatch-sq-wrap {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
+  overflow: hidden;
 }
-.palette-swatch {
-  width: 30px;
-  height: 30px;
+.palette-swatch-sq {
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
+}
+/* Subtle border when swatch is very light (near-white) */
+.palette-swatch-sq--light {
+  box-shadow: inset 0 0 0 1.5px rgba(0,0,0,0.14);
+}
+/* Show a ring in edit mode to indicate interactivity */
+.palette-swatch-sq--edit {
+  cursor: grab;
+}
+/* Delete button on each swatch in edit mode */
+.swatch-delete-btn {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
-  border: 2px solid transparent;
-  cursor: pointer;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.2);
-  flex-shrink: 0;
-  transition: transform 0.1s;
-}
-.palette-swatch:hover { transform: scale(1.1); }
-.palette-swatch.active {
-  border-color: #333;
-  transform: scale(1.15);
-}
-.palette-add {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  border: 2px dashed var(--border);
-  background: none;
-  cursor: pointer;
-  font-size: 1rem;
-  color: var(--muted);
+  background: rgba(0,0,0,0.55);
+  color: #fff;
+  border: none;
+  font-size: 0.75rem;
+  line-height: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
+  cursor: pointer;
+  padding: 0;
 }
-.palette-add:hover { border-color: var(--accent); color: var(--accent); }
+.palette-edit-mode .drag-handle { background: rgba(232,49,90,0.06); }
 .palette-editor {
   display: flex;
   align-items: center;
