@@ -276,9 +276,8 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
       // Update UI immediately — do not await DB before showing the change
       setElements(prev => prev.filter(e => e.id !== objectEl.id).map(e => e.id === colId ? updated : e))
       setSelectedId(colId)
-      // Persist asynchronously (failures are logged, not surfaced to user)
-      await saveElement(updated)
-      await deleteElement(objectEl.id)
+      saveElement(updated).catch(e => console.error('[drop] saveElement failed:', e))
+      deleteElement(objectEl.id).catch(e => console.error('[drop] deleteElement failed:', e))
     } catch (err) {
       console.error('[drop] dropIntoCollection failed:', err)
     }
@@ -323,8 +322,8 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
 
   async function removeChildBoard(id) {
     if (!confirm('Delete this board and everything in it?')) return
-    await deleteBoard(id)
     setChildBoards(prev => prev.filter(b => b.id !== id))
+    deleteBoard(id).catch(e => console.error('[removeChildBoard] deleteBoard failed:', e))
   }
 
   async function handleNavAction(type) {
@@ -340,8 +339,8 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
         color: '#e8315a',
         x: bPos.x, y: bPos.y, createdAt: Date.now()
       }
-      await saveBoard(newBoard)
       setChildBoards(prev => [...prev, newBoard])
+      saveBoard(newBoard).catch(e => console.error('[handleNavAction] saveBoard failed:', e))
     } else if (type === 'document') {
       docRef.current.click()
     } else if (type === 'palette') {
