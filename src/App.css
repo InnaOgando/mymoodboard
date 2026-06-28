@@ -951,6 +951,7 @@ body {
   border: 1.5px solid var(--border);
   padding: 0;
   overflow: hidden;
+  max-width: none; /* override .el-card max-width so columns can exceed 2 */
 }
 
 /* .collection-items layout is now handled by SortableGrid (position: absolute items) */

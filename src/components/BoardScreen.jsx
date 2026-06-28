@@ -172,15 +172,16 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
     const el = elementsRef.current.find(e => e.id === id)
     setElements(prev => prev.filter(e => e.id !== id))
     setSelectedId(null)
-    await deleteElement(id)
-    if (el?.type === 'image' && el.content?.src?.startsWith('http')) {
-      deleteImageIfOrphaned(el.content.src, id)
-    }
+    // Show undo toast immediately — before any async work so it's never blocked
     if (el) {
       setUndoStack(prev => [...prev.slice(-19), el])
       setUndoVisible(true)
       clearTimeout(undoTimer.current)
       undoTimer.current = setTimeout(() => setUndoVisible(false), 5000)
+    }
+    await deleteElement(id).catch(e => console.warn('[db] deleteElement error:', e))
+    if (el?.type === 'image' && el.content?.src?.startsWith('http')) {
+      deleteImageIfOrphaned(el.content.src, id)
     }
   }
 
@@ -264,14 +265,23 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
   // Drop a canvas element into a collection (shared logic for drag-end and tap-fallback)
   async function dropIntoCollection(objectEl, colId) {
     const col = elementsRef.current.find(e => e.id === colId)
-    if (!col) return
-    const items = getCollectionItems(col.content)
-    const newItem = { id: uid(), type: objectEl.type, content: objectEl.content, w: objectEl.w, h: objectEl.h }
-    const updated = { ...col, content: { items: [...items, newItem] } }
-    await saveElement(updated)
-    await deleteElement(objectEl.id)
-    setElements(prev => prev.filter(e => e.id !== objectEl.id).map(e => e.id === colId ? updated : e))
-    setSelectedId(colId)
+    if (!col) {
+      console.warn('[drop] collection not found in elementsRef:', colId, elementsRef.current.map(e => e.id))
+      return
+    }
+    try {
+      const items = getCollectionItems(col.content)
+      const newItem = { id: uid(), type: objectEl.type, content: objectEl.content, w: objectEl.w, h: objectEl.h }
+      const updated = { ...col, content: { items: [...items, newItem] } }
+      // Update UI immediately — do not await DB before showing the change
+      setElements(prev => prev.filter(e => e.id !== objectEl.id).map(e => e.id === colId ? updated : e))
+      setSelectedId(colId)
+      // Persist asynchronously (failures are logged, not surfaced to user)
+      await saveElement(updated)
+      await deleteElement(objectEl.id)
+    } catch (err) {
+      console.error('[drop] dropIntoCollection failed:', err)
+    }
   }
 
   // ── Drag & Drop (canvas ↔ collection) ──────────────────────────────────────
