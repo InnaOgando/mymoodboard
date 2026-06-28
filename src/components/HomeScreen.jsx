@@ -74,34 +74,34 @@ export default function HomeScreen({ onOpenBoard, session }) {
       y: pos.y,
       createdAt: Date.now()
     }
-    await saveBoard(board)
     setBoards(prev => [...prev, board])
     setNewName('')
     setShowNew(false)
+    saveBoard(board).catch(e => console.error('[createBoard] saveBoard failed:', e))
   }
 
-  async function moveBoard(id, x, y) {
+  function moveBoard(id, x, y) {
     const board = boardsRef.current.find(b => b.id === id)
     if (!board) return
     const updated = { ...board, x, y }
-    await saveBoard(updated)
     setBoards(prev => prev.map(b => b.id === id ? updated : b))
+    saveBoard(updated).catch(e => console.error('[moveBoard] saveBoard failed:', e))
   }
 
-  async function changeBoardColor(id, color) {
+  function changeBoardColor(id, color) {
     const board = boardsRef.current.find(b => b.id === id)
     if (!board) return
     const updated = { ...board, color }
-    await saveBoard(updated)
     setBoards(prev => prev.map(b => b.id === id ? updated : b))
+    saveBoard(updated).catch(e => console.error('[changeBoardColor] saveBoard failed:', e))
   }
 
-  async function renameBoard(id, name) {
+  function renameBoard(id, name) {
     const board = boardsRef.current.find(b => b.id === id)
     if (!board || !name.trim()) return
     const updated = { ...board, name: name.trim() }
-    await saveBoard(updated)
     setBoards(prev => prev.map(b => b.id === id ? updated : b))
+    saveBoard(updated).catch(e => console.error('[renameBoard] saveBoard failed:', e))
   }
 
   async function removeBoard(id) {

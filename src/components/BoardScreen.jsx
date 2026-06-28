@@ -143,7 +143,9 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
       content,
       createdAt: Date.now()
     }
-    // Update UI immediately so the element appears even if the DB write is slow
+    // Sync ref immediately so the next findFreePosition call sees this element
+    // (the useEffect that mirrors state→ref only runs after the next render)
+    elementsRef.current = [...elementsRef.current, el]
     setElements(prev => [...prev, el])
     const editableTypes = ['idea', 'text', 'note', 'link', 'todo']
     if (editableTypes.includes(type)) setEditingId(el.id)
