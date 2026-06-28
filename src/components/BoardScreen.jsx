@@ -180,7 +180,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
       const col = {
         id: uid(), boardId, type: 'collection',
         x: objectEl.x, y: objectEl.y,
-        w: objectEl.w || 150,
+        w: Math.max(objectEl.w || 260, 260),
         content: { items },
         createdAt: Date.now()
       }
@@ -245,9 +245,13 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
     const cols = elementsRef.current.filter(e => e.type === 'collection' || e.type === 'column')
     for (const col of cols) {
       const items = getCollectionItems(col.content)
-      const colW = (col.w || 150) + 40
-      const colH = Math.max(items.length * 170, 60) + 80
-      if (cx >= col.x - 20 && cx <= col.x + colW && cy >= col.y - 20 && cy <= col.y + colH) {
+      const colW = col.w || 260
+      // Match the CSS grid: 120px thumbs, 4px gap, 16px total horizontal padding
+      const THUMB = 120, GAP = 4, PAD = 16
+      const gridCols = Math.max(1, Math.floor((colW - PAD + GAP) / (THUMB + GAP)))
+      const gridRows = Math.ceil(Math.max(1, items.length) / gridCols)
+      const colH = gridRows * (THUMB + GAP) + 50 // 50px covers header + bottom pad
+      if (cx >= col.x - 20 && cx <= col.x + colW + 20 && cy >= col.y - 20 && cy <= col.y + colH) {
         return col.id
       }
     }

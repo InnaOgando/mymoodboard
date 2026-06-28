@@ -32,7 +32,6 @@ function MiniObject({ item }) {
           src={item.content.src}
           alt=""
           draggable={false}
-          style={{ width: '100%', display: 'block' }}
         />
       )
     case 'idea':
