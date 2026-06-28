@@ -126,9 +126,9 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
   async function load() {
     const b = await getBoard(boardId)
     setBoard(b)
-    const els = await getElements(boardId)
+    const els = await getElements(boardId, { onSync: setElements })
     setElements(els)
-    const children = await getBoards(boardId)
+    const children = await getBoards(boardId, { onSync: setChildBoards })
     setChildBoards(children)
   }
 

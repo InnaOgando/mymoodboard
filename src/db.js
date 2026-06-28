@@ -24,13 +24,9 @@ export async function getDB() {
       }
 
       // ── v3 stores ──
-      // imageCache: stores optimised WebP blobs as dataUrls, keyed by SHA-256 hash.
-      // Lets images display immediately when offline; src is updated to remote URL later.
       if (!db.objectStoreNames.contains('imageCache')) {
         db.createObjectStore('imageCache', { keyPath: 'hash' })
       }
-      // pendingOps: operations that must be replayed to Supabase when back online.
-      // Prevents zombie boards and ensures deletes are honoured after reconnect.
       if (!db.objectStoreNames.contains('pendingOps')) {
         db.createObjectStore('pendingOps', { keyPath: 'id' })
       }
@@ -62,25 +58,41 @@ async function currentUserId() {
   return (_cachedUserId = data?.session?.user?.id ?? null)
 }
 
-// ── Image cache ───────────────────────────────────────────────────────────────
-// Blobs are stored directly — no base64 encoding overhead.
-// IndexedDB supports Blob natively since Safari 14 / iOS 14.
+// ── User isolation ────────────────────────────────────────────────────────────
+// IndexedDB is shared within a browser origin. We store the userId that last
+// populated the local cache. If a different user is detected on load, we wipe
+// boards and elements so no stale data from the previous session is displayed.
+// imageCache is content-addressed (SHA-256 hash) so it is safe to share.
 
-/** Store an optimised WebP Blob by SHA-256 hash. */
+async function _ensureUserIsolation(userId, db) {
+  const row = await db.get('config', 'localUserId')
+  const storedId = row?.value ?? null
+  if (storedId && storedId !== userId) {
+    console.log('[db] User changed (%s → %s) — clearing local cache', storedId, userId)
+    const tx = db.transaction(['boards', 'elements', 'pendingOps'], 'readwrite')
+    await tx.objectStore('boards').clear()
+    await tx.objectStore('elements').clear()
+    await tx.objectStore('pendingOps').clear()
+    await tx.done
+  }
+  if (userId && storedId !== userId) {
+    await db.put('config', { key: 'localUserId', value: userId })
+  }
+}
+
+// ── Image cache ───────────────────────────────────────────────────────────────
+
 export async function setCachedImage(hash, blob) {
   const db = await getDB()
   await db.put('imageCache', { hash, blob, cachedAt: Date.now() })
 }
 
-/** Retrieve the cached Blob for a given hash. Returns null if not found. */
 export async function getCachedBlob(hash) {
   const db = await getDB()
   const row = await db.get('imageCache', hash)
   if (!row) return null
-  // Current format: { hash, blob }
   if (row.blob instanceof Blob) return row.blob
-  // Legacy format from v3.0 (stored dataUrl before this was updated):
-  // convert once and re-save as Blob so future reads are fast.
+  // Legacy format (dataUrl) — migrate once
   if (row.dataUrl && typeof row.dataUrl === 'string') {
     const blob = _dataUrlToBlob(row.dataUrl)
     await db.put('imageCache', { hash, blob, cachedAt: row.cachedAt || Date.now() })
@@ -100,7 +112,6 @@ function _dataUrlToBlob(dataUrl) {
 
 // ── Debug stats ───────────────────────────────────────────────────────────────
 
-/** Return diagnostic information for the DebugPanel. */
 export async function getDebugStats() {
   const db = await getDB()
   const [boards, elements, imageCache, pendingOps] = await Promise.all([
@@ -124,9 +135,6 @@ export async function getDebugStats() {
 }
 
 // ── Pending operations ────────────────────────────────────────────────────────
-// We record destructive operations that could not be sent to Supabase while
-// offline.  On reconnect (or startup) we replay them so deletions and image
-// uploads are never silently lost.
 
 function _opId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
@@ -137,10 +145,6 @@ async function _queueOp(op) {
   await db.put('pendingOps', { id: _opId(), ...op, queuedAt: Date.now() })
 }
 
-/**
- * Replay all queued operations against Supabase.
- * Call on startup and whenever the browser goes online.
- */
 export async function flushPendingOps() {
   if (!navigator.onLine) return
   const userId = await currentUserId()
@@ -153,52 +157,56 @@ export async function flushPendingOps() {
   for (const op of ops) {
     try {
       if (op.entity === 'board' && op.op === 'delete') {
-        // Delete child elements first, then the board
         await supabase.from('elements').delete().eq('board_id', op.entityId).eq('user_id', userId)
         await supabase.from('boards').delete().eq('id', op.entityId).eq('user_id', userId)
       } else if (op.entity === 'element' && op.op === 'delete') {
         await supabase.from('elements').delete().eq('id', op.entityId).eq('user_id', userId)
       } else if (op.entity === 'image' && op.op === 'upload') {
-        // Handled separately by ImageImportService.flushPendingImageUploads()
-        continue
+        continue // handled by ImageImportService.flushPendingImageUploads()
       }
       await db.delete('pendingOps', op.id)
     } catch (e) {
       console.warn('[db] flushPendingOps: op failed, will retry:', op.id, e.message)
-      // Leave in queue — it will be retried on the next online event
     }
   }
 }
 
-/** Return the set of entity IDs that have pending delete operations. */
 async function _getPendingDeleteIds() {
   const db = await getDB()
   const ops = await db.getAll('pendingOps')
-  return new Set(
-    ops
-      .filter(op => op.op === 'delete')
-      .map(op => op.entityId)
-  )
+  return new Set(ops.filter(op => op.op === 'delete').map(op => op.entityId))
 }
 
 // ── Boards ────────────────────────────────────────────────────────────────────
 
-export async function getBoards(parentId = null) {
+/**
+ * Returns boards from IndexedDB immediately (local-first).
+ * Starts a background Supabase sync; calls onSync(freshBoards) when done
+ * so callers can update React state without a page refresh.
+ */
+export async function getBoards(parentId = null, { onSync } = {}) {
   const db = await getDB()
   const pid = toParentId(parentId)
-
-  // LOCAL-FIRST: return IndexedDB data immediately
   const pendingDeletes = await _getPendingDeleteIds()
+
+  const userId = await currentUserId()
+
+  // Clear stale cache if a different user is now signed in
+  if (userId) await _ensureUserIsolation(userId, db)
+
   let local = await db.getAllFromIndex('boards', 'parentId', pid)
-  // Hide anything queued for deletion (tombstone filter)
   local = local.filter(b => !pendingDeletes.has(b.id))
 
-  // Background sync with Supabase (non-blocking)
-  const userId = await currentUserId()
   if (userId && navigator.onLine) {
-    _syncBoardsDown(pid, userId, db, pendingDeletes).catch(
-      e => console.warn('[db] background board sync error:', e.message)
-    )
+    _syncBoardsDown(pid, userId, db, pendingDeletes)
+      .then(async () => {
+        if (!onSync) return
+        // Re-read IndexedDB after sync so React state gets the merged result
+        let fresh = await db.getAllFromIndex('boards', 'parentId', pid)
+        fresh = fresh.filter(b => !pendingDeletes.has(b.id))
+        onSync(fresh)
+      })
+      .catch(e => console.warn('[db] background board sync error:', e.message))
   }
 
   return local
@@ -216,21 +224,23 @@ async function _syncBoardsDown(pid, userId, db, pendingDeletes) {
     return
   }
 
-  if (!data || data.length === 0) {
-    // Supabase empty — push any unsynced local boards up
-    const local = await db.getAllFromIndex('boards', 'parentId', pid)
-    for (const b of local) {
-      if (!pendingDeletes.has(b.id)) {
-        supabase.from('boards').upsert(toSupabaseBoard(b, userId)).catch(() => {})
-      }
+  const supabaseIds = new Set((data || []).map(r => r.id))
+
+  // Push any locally-created boards that Supabase doesn't have yet
+  // (created offline or before first sync on this device)
+  const localBoards = await db.getAllFromIndex('boards', 'parentId', pid)
+  for (const b of localBoards) {
+    if (!supabaseIds.has(b.id) && !pendingDeletes.has(b.id)) {
+      supabase.from('boards').upsert(toSupabaseBoard(b, userId)).catch(() => {})
     }
-    return
   }
 
+  if (!data || data.length === 0) return
+
+  // Write all Supabase boards into IndexedDB
   const tx = db.transaction('boards', 'readwrite')
   for (const row of data) {
     const board = fromSupabaseBoard(row)
-    // Never restore a board the user has queued for deletion
     if (pendingDeletes.has(board.id)) continue
     await tx.objectStore('boards').put({ ...board, parentId: toParentId(board.parentId) })
   }
@@ -239,10 +249,8 @@ async function _syncBoardsDown(pid, userId, db, pendingDeletes) {
 
 export async function getBoard(id) {
   const db = await getDB()
-  // LOCAL-FIRST
   const local = await db.get('boards', id)
   if (local) {
-    // Sync in background
     const userId = await currentUserId()
     if (userId && navigator.onLine) {
       supabase.from('boards').select('*').eq('id', id).eq('user_id', userId).single()
@@ -253,7 +261,7 @@ export async function getBoard(id) {
     }
     return local
   }
-  // Not in local cache — try Supabase
+  // Not in local cache — fetch from Supabase
   const userId = await currentUserId()
   if (!userId || !navigator.onLine) return null
   const { data, error } = await supabase.from('boards').select('*').eq('id', id).eq('user_id', userId).single()
@@ -277,10 +285,8 @@ export async function saveBoard(board) {
 
 export async function deleteBoard(id) {
   const db = await getDB()
-  // Recursively delete child boards
   const children = await db.getAllFromIndex('boards', 'parentId', id)
   for (const child of children) await deleteBoard(child.id)
-  // Delete local elements
   const elements = await db.getAllFromIndex('elements', 'boardId', id)
   const tx = db.transaction(['boards', 'elements'], 'readwrite')
   for (const el of elements) await tx.objectStore('elements').delete(el.id)
@@ -290,30 +296,37 @@ export async function deleteBoard(id) {
   const userId = await currentUserId()
   if (!userId) return
   if (navigator.onLine) {
-    // Send immediately — fire & verify (not fire & forget so deletions succeed)
     await supabase.from('elements').delete().eq('board_id', id).eq('user_id', userId)
     await supabase.from('boards').delete().eq('id', id).eq('user_id', userId)
   } else {
-    // Tombstone: queue the delete so it's replayed when back online
     await _queueOp({ entity: 'board', op: 'delete', entityId: id })
   }
 }
 
 // ── Elements ──────────────────────────────────────────────────────────────────
 
-export async function getElements(boardId) {
+/**
+ * Returns elements from IndexedDB immediately (local-first).
+ * Starts a background Supabase sync; calls onSync(freshElements) when done
+ * so callers can update React state without a page refresh.
+ */
+export async function getElements(boardId, { onSync } = {}) {
   const db = await getDB()
   const pendingDeletes = await _getPendingDeleteIds()
 
-  // LOCAL-FIRST
   let local = await db.getAllFromIndex('elements', 'boardId', boardId)
   local = local.filter(el => !pendingDeletes.has(el.id))
 
   const userId = await currentUserId()
   if (userId && navigator.onLine) {
-    _syncElementsDown(boardId, userId, db, pendingDeletes).catch(
-      e => console.warn('[db] background element sync error:', e.message)
-    )
+    _syncElementsDown(boardId, userId, db, pendingDeletes)
+      .then(async () => {
+        if (!onSync) return
+        let fresh = await db.getAllFromIndex('elements', 'boardId', boardId)
+        fresh = fresh.filter(el => !pendingDeletes.has(el.id))
+        onSync(fresh)
+      })
+      .catch(e => console.warn('[db] background element sync error:', e.message))
   }
 
   return local
@@ -331,16 +344,19 @@ async function _syncElementsDown(boardId, userId, db, pendingDeletes) {
     return
   }
 
-  if (!data || data.length === 0) {
-    const local = await db.getAllFromIndex('elements', 'boardId', boardId)
-    for (const el of local) {
-      if (!pendingDeletes.has(el.id)) {
-        supabase.from('elements').upsert(toSupabaseElement(el, userId)).catch(() => {})
-      }
+  const supabaseIds = new Set((data || []).map(r => r.id))
+
+  // Push any locally-created elements that Supabase doesn't have yet
+  const localEls = await db.getAllFromIndex('elements', 'boardId', boardId)
+  for (const el of localEls) {
+    if (!supabaseIds.has(el.id) && !pendingDeletes.has(el.id)) {
+      supabase.from('elements').upsert(toSupabaseElement(el, userId)).catch(() => {})
     }
-    return
   }
 
+  if (!data || data.length === 0) return
+
+  // Write all Supabase elements into IndexedDB
   const tx = db.transaction('elements', 'readwrite')
   for (const row of data) {
     const el = fromSupabaseElement(row)

@@ -57,7 +57,7 @@ export default function HomeScreen({ onOpenBoard, session }) {
   useEffect(() => { load() }, [])
 
   async function load() {
-    const list = await getBoards(null)
+    const list = await getBoards(null, { onSync: setBoards })
     setBoards(list)
   }
 
