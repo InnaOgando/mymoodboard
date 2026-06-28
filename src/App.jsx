@@ -3,7 +3,14 @@ import { supabase } from './supabase'
 import HomeScreen from './components/HomeScreen'
 import BoardScreen from './components/BoardScreen'
 import AuthScreen from './components/AuthScreen'
+import { flushPendingOps } from './db'
+import { flushPendingImageUploads } from './ImageImportService'
 import './App.css'
+
+async function syncOnline() {
+  await flushPendingOps()
+  await flushPendingImageUploads()
+}
 
 function PasswordResetScreen({ onDone }) {
   const [password, setPassword] = useState('')
@@ -71,6 +78,13 @@ export default function App() {
   const [isRecovery, setIsRecovery] = useState(isRecoveryRef.current)
   const [session, setSession] = useState(undefined)
   const [boardStack, setBoardStack] = useState([])
+
+  // Flush queued operations and pending image uploads on mount and on reconnect
+  useEffect(() => {
+    if (navigator.onLine) syncOnline()
+    window.addEventListener('online', syncOnline)
+    return () => window.removeEventListener('online', syncOnline)
+  }, [])
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, s) => {

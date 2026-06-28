@@ -1,6 +1,13 @@
+import { useState, useEffect } from 'react'
 import ResizeHandle from '../ResizeHandle'
 import SortableGrid from '../SortableGrid'
 import { getPaletteColors } from './PaletteObject'
+
+// Shared preset colors for collection borders/headers
+const COLLECTION_COLORS = [
+  '#e8315a', '#f4845f', '#f7c948', '#4caf82',
+  '#4a90d9', '#a78bfa', '#f9a8d4', '#94a3b8',
+]
 
 function normalizeType(type) {
   if (type === 'text' || type === 'note') return 'idea'
@@ -74,33 +81,86 @@ function MiniObject({ item }) {
 }
 
 export default function CollectionObject({
-  el, selected, isDropTarget, onUpdate, onDelete, onResize, onAddImage, onEjectItem, scaleRef
+  el, selected, isDropTarget, onUpdate, onDelete, onResize, onEjectItem, onDuplicate, scaleRef
 }) {
   const w = el.w || 260
   const items = getCollectionItems(el.content)
+  const accentColor = el.content.color || null
+  const label = el.content.name || 'Collection'
+
+  const [showMenu, setShowMenu] = useState(false)
+  const [showColors, setShowColors] = useState(false)
+
+  // Close menu/color picker when deselected
+  useEffect(() => {
+    if (!selected) { setShowMenu(false); setShowColors(false) }
+  }, [selected])
 
   function handleReorder(newItems) {
     onUpdate?.({ ...el.content, items: newItems })
   }
 
+  function handleRename() {
+    const next = prompt('Collection name:', label)
+    if (next !== null) onUpdate({ ...el.content, name: next.trim() || 'Collection' })
+    setShowMenu(false)
+  }
+
+  function handleColorSelect(color) {
+    onUpdate({ ...el.content, color })
+    setShowColors(false)
+    setShowMenu(false)
+  }
+
   return (
     <div style={{ position: 'relative', width: w }}>
-      {selected && (
-        <div className="img-popup-menu" onPointerDown={e => e.stopPropagation()}>
-          <button className="img-popup-btn" onPointerDown={e => e.stopPropagation()}
-            onClick={e => { e.stopPropagation(); onAddImage?.() }}>+ Image</button>
-          <button className="img-popup-btn img-popup-delete" onPointerDown={e => e.stopPropagation()}
-            onClick={e => { e.stopPropagation(); onDelete() }}>×</button>
+
+      {/* ⋯ menu dropdown */}
+      {selected && showMenu && (
+        <div className="col-menu-dropdown" onPointerDown={e => e.stopPropagation()}>
+          <button className="col-menu-item" onClick={e => { e.stopPropagation(); handleRename() }}>Rename</button>
+          <button className="col-menu-item" onClick={e => { e.stopPropagation(); setShowMenu(false); setShowColors(true) }}>Color</button>
+          <button className="col-menu-item" onClick={e => { e.stopPropagation(); onDuplicate?.(); setShowMenu(false) }}>Duplicate</button>
+          <button className="col-menu-item col-menu-danger" onClick={e => { e.stopPropagation(); onDelete(); setShowMenu(false) }}>Delete</button>
+        </div>
+      )}
+
+      {/* Color picker panel */}
+      {selected && showColors && (
+        <div className="col-color-panel" onPointerDown={e => e.stopPropagation()}>
+          {COLLECTION_COLORS.map(c => (
+            <button
+              key={c}
+              className={`col-color-swatch ${accentColor === c ? 'col-color-swatch--active' : ''}`}
+              style={{ background: c }}
+              onClick={e => { e.stopPropagation(); handleColorSelect(c) }}
+            />
+          ))}
+          <button className="col-color-none"
+            onClick={e => { e.stopPropagation(); handleColorSelect(null) }}>None</button>
         </div>
       )}
 
       <div
         className={`el-card el-collection ${selected ? 'selected' : ''} ${isDropTarget ? 'drop-target' : ''}`}
-        style={{ width: w }}
+        style={{
+          width: w,
+          borderColor: accentColor || undefined,
+        }}
       >
-        <div className="drag-handle">
+        <div
+          className="drag-handle"
+          style={{ background: accentColor ? `${accentColor}1a` : undefined }}
+        >
           <span className="handle-dots">⠿</span>
-          <span className="column-label">Collection{selected ? ' · drag to reorder' : ''}</span>
+          <span className="column-label">{label}{selected && items.length > 0 ? ' · drag to reorder' : ''}</span>
+          {selected && (
+            <button
+              className="col-menu-btn"
+              onPointerDown={e => e.stopPropagation()}
+              onClick={e => { e.stopPropagation(); setShowColors(false); setShowMenu(m => !m) }}
+            >⋯</button>
+          )}
         </div>
 
         {items.length === 0 ? (
@@ -116,7 +176,7 @@ export default function CollectionObject({
             padLeft={8}
             disabled={!selected}
             onReorder={handleReorder}
-            renderItem={(item, index, { isDragged }) => (
+            renderItem={(item) => (
               <div className="collection-item-wrap">
                 <MiniObject item={item} />
                 {selected && (

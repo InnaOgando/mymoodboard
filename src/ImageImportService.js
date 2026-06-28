@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from './supabase'
+import { getCachedImage, setCachedImage, saveElement, getDB } from './db'
 
 const IMAGE_CONFIG = {
   MAX_PX: 512,
@@ -76,6 +77,24 @@ function _canvasToBlob(canvas, type, quality) {
   })
 }
 
+function _blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result)
+    reader.onerror = reject
+    reader.readAsDataURL(blob)
+  })
+}
+
+function _dataUrlToBlob(dataUrl) {
+  const [header, b64] = dataUrl.split(',')
+  const mime = header.match(/:(.*?);/)[1]
+  const bytes = atob(b64)
+  const arr = new Uint8Array(bytes.length)
+  for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i)
+  return new Blob([arr], { type: mime })
+}
+
 // ── 2. SHA-256 deduplication ─────────────────────────────────────────────────
 
 export async function sha256Hex(blob) {
@@ -93,7 +112,9 @@ async function _findExistingUrl(hash, userId) {
     .eq('type', 'image')
     .limit(1)
   if (data && data.length > 0) {
-    return data[0].content?.src ?? null
+    const src = data[0].content?.src
+    // Only return a remote URL, not a stale dataUrl from a previous offline session
+    if (src && src.startsWith('http')) return src
   }
   return null
 }
@@ -117,25 +138,81 @@ async function _uploadWebp(blob, userId, hash) {
 // ── Main entry point ──────────────────────────────────────────────────────────
 
 /**
- * Full pipeline: optimize → deduplicate → upload.
+ * Full pipeline: optimize → cache locally → upload when online.
+ *
+ * When offline: returns the local dataUrl as `src` and sets `pendingUpload: true`.
+ * The dataUrl is saved to the element's content.src temporarily.
+ * Call flushPendingImageUploads() on reconnect to swap it for the remote URL.
+ *
  * @param {File|Blob|string} input
- * @returns {{ src: string, hash: string, width: number, height: number, sizeBytes: number }}
+ * @returns {{ src: string, hash: string, width: number, height: number, sizeBytes: number, pendingUpload?: boolean }}
  */
 export async function processAndUpload(input) {
-  const { data: { session } } = await supabase.auth.getSession()
-  const userId = session?.user?.id
-  if (!userId) throw new Error('Not authenticated')
-
   const { blob, width, height, sizeBytes } = await optimize(input)
   const hash = await sha256Hex(blob)
 
-  const existingUrl = await _findExistingUrl(hash, userId)
-  if (existingUrl) {
-    return { src: existingUrl, hash, width, height, sizeBytes }
+  // Always cache the optimised WebP locally so images display even offline
+  const dataUrl = await _blobToDataUrl(blob)
+  await setCachedImage(hash, dataUrl)
+
+  // Auth session is stored locally by Supabase — this works offline
+  const { data: { session } } = await supabase.auth.getSession()
+  const userId = session?.user?.id
+
+  if (!userId) throw new Error('Not authenticated')
+
+  if (!navigator.onLine) {
+    // Offline: return dataUrl as temporary src; upload will happen on reconnect
+    return { src: dataUrl, hash, width, height, sizeBytes, pendingUpload: true }
   }
 
-  const src = await _uploadWebp(blob, userId, hash)
-  return { src, hash, width, height, sizeBytes }
+  try {
+    const existingUrl = await _findExistingUrl(hash, userId)
+    if (existingUrl) return { src: existingUrl, hash, width, height, sizeBytes }
+    const src = await _uploadWebp(blob, userId, hash)
+    return { src, hash, width, height, sizeBytes }
+  } catch (e) {
+    console.warn('[ImageImportService] upload failed, using local dataUrl:', e.message)
+    return { src: dataUrl, hash, width, height, sizeBytes, pendingUpload: true }
+  }
+}
+
+/**
+ * Upload all images whose src is still a local dataUrl (from an offline session).
+ * Called on app startup and whenever the browser comes online.
+ */
+export async function flushPendingImageUploads() {
+  if (!navigator.onLine) return
+  const { data: { session } } = await supabase.auth.getSession()
+  const userId = session?.user?.id
+  if (!userId) return
+
+  const db = await getDB()
+  const allElements = await db.getAll('elements')
+  const pending = allElements.filter(el =>
+    el.type === 'image' && el.content?.src?.startsWith('data:') && el.content?.hash
+  )
+
+  if (pending.length === 0) return
+  console.log('[ImageImportService] uploading', pending.length, 'pending image(s)')
+
+  for (const el of pending) {
+    const { hash } = el.content
+    try {
+      // Re-use existing upload if another session already uploaded this hash
+      let remoteUrl = await _findExistingUrl(hash, userId)
+      if (!remoteUrl) {
+        const cached = await getCachedImage(hash)
+        if (!cached) continue
+        const blob = _dataUrlToBlob(cached)
+        remoteUrl = await _uploadWebp(blob, userId, hash)
+      }
+      const updated = { ...el, content: { ...el.content, src: remoteUrl } }
+      await saveElement(updated)
+    } catch (e) {
+      console.warn('[ImageImportService] flush failed for hash:', hash, e.message)
+    }
+  }
 }
 
 // ── 4. Orphan cleanup ─────────────────────────────────────────────────────────
@@ -144,6 +221,8 @@ export async function processAndUpload(input) {
  * Delete image from Storage only if no other elements (besides currentElementId) reference it.
  */
 export async function deleteImageIfOrphaned(url, currentElementId) {
+  // Local dataUrls are not in Supabase Storage — skip
+  if (!url || url.startsWith('data:')) return
   try {
     const { data: { session } } = await supabase.auth.getSession()
     const userId = session?.user?.id

@@ -48,7 +48,6 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
   const [editingId, setEditingId] = useState(null)
   const [showImagePicker, setShowImagePicker] = useState(false)
   const [pendingPos, setPendingPos] = useState({ x: 80, y: 80 })
-  const [columnTarget, setColumnTarget] = useState(null)
   const [dropOverCollectionId, _setDropOverCollectionId] = useState(null)
   const [undoStack, setUndoStack] = useState([])
   const [undoVisible, setUndoVisible] = useState(false)
@@ -63,7 +62,6 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
   const scaleRef = useRef(1)
   const fileRef = useRef()
   const docRef = useRef()
-  const collectionFileRef = useRef()
   const importRef = useRef()
 
   function setDropOverCollectionId(id) {
@@ -190,16 +188,6 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
     } catch (err) { console.error('makeCollection failed', err) }
   }
 
-  async function addImageToCollection(colId, src) {
-    const col = elementsRef.current.find(e => e.id === colId)
-    if (!col) return
-    const items = getCollectionItems(col.content)
-    const newItem = { id: uid(), type: 'image', content: { src } }
-    const updated = { ...col, content: { items: [...items, newItem] } }
-    await saveElement(updated)
-    setElements(prev => prev.map(e => e.id === colId ? updated : e))
-  }
-
   async function ejectFromCollection(colId, itemId) {
     const col = elementsRef.current.find(e => e.id === colId)
     if (!col) return
@@ -218,12 +206,29 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
     }
     await saveElement(ejected)
 
-    // Always keep the collection alive even when empty (so user can drag back).
-    // An empty collection shows "Drag objects here" and can be deleted explicitly.
-    const updated = { ...col, content: { items: remaining } }
-    await saveElement(updated)
-    setElements(prev => prev.map(e => e.id === colId ? updated : e).concat(ejected))
+    if (remaining.length === 0) {
+      // Auto-delete empty collection
+      await deleteElement(colId)
+      setElements(prev => prev.filter(e => e.id !== colId).concat(ejected))
+    } else {
+      const updated = { ...col, content: { ...col.content, items: remaining } }
+      await saveElement(updated)
+      setElements(prev => prev.map(e => e.id === colId ? updated : e).concat(ejected))
+    }
     setSelectedId(ejected.id)
+  }
+
+  async function duplicateCollection(col) {
+    const newCol = {
+      id: uid(), boardId, type: 'collection',
+      x: col.x + 30, y: col.y + 30,
+      w: col.w,
+      content: { ...col.content, items: getCollectionItems(col.content).map(item => ({ ...item, id: uid() })) },
+      createdAt: Date.now()
+    }
+    await saveElement(newCol)
+    setElements(prev => [...prev, newCol])
+    setSelectedId(newCol.id)
   }
 
   // Drop a canvas element into a collection (shared logic for drag-end and tap-fallback)
@@ -251,7 +256,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
       const gridCols = Math.max(1, Math.floor((colW - PAD + GAP) / (THUMB + GAP)))
       const gridRows = Math.ceil(Math.max(1, items.length) / gridCols)
       const colH = gridRows * (THUMB + GAP) + 50 // 50px covers header + bottom pad
-      if (cx >= col.x - 20 && cx <= col.x + colW + 20 && cy >= col.y - 20 && cy <= col.y + colH) {
+      if (cx >= col.x && cx <= col.x + colW && cy >= col.y && cy <= col.y + colH) {
         return col.id
       }
     }
@@ -462,8 +467,8 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
               onEdit={() => setEditingId(el.id)}
               onResize={(w, h) => resizeElement(el.id, w, h)}
               onMakeCollection={() => makeCollection(el)}
-              onAddImage={() => { setColumnTarget(el.id); collectionFileRef.current.click() }}
               onEjectItem={itemId => ejectFromCollection(el.id, itemId)}
+              onDuplicate={() => duplicateCollection(el)}
               isDropTarget={dropOverCollectionId === el.id}
               scaleRef={scaleRef}
             />
@@ -477,21 +482,6 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
         onChange={e => { handleFiles(Array.from(e.target.files)); e.target.value = '' }} />
       <input ref={docRef} type="file" accept=".pdf,.doc,.docx" multiple style={{ display: 'none' }}
         onChange={e => { handleFiles(Array.from(e.target.files)); e.target.value = '' }} />
-      <input ref={collectionFileRef} type="file" accept="image/*" multiple style={{ display: 'none' }}
-        onChange={async e => {
-          const colId = columnTarget
-          if (!colId) return
-          setColumnTarget(null)
-          for (const file of Array.from(e.target.files)) {
-            try {
-              const meta = await processAndUpload(file)
-              await addImageToCollection(colId, meta.src)
-            } catch (err) {
-              console.warn('[collectionFileRef] processAndUpload failed:', err)
-            }
-          }
-          e.target.value = ''
-        }} />
       <input ref={importRef} type="file" accept=".json" style={{ display: 'none' }} onChange={handleImport} />
 
       {showImagePicker && (

@@ -1010,6 +1010,9 @@ body {
   letter-spacing: 0.04em;
   flex: 1;
   padding-left: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .col-add-btn {
   font-size: 0.7rem !important;
@@ -1021,6 +1024,82 @@ body {
   color: #666;
   border: 1px solid var(--border);
   border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+/* Collection ⋯ menu */
+.col-menu-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #666;
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.col-menu-btn:hover { background: rgba(0,0,0,0.08); }
+
+.col-menu-dropdown {
+  position: absolute;
+  top: -8px;
+  right: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  z-index: 200;
+  min-width: 140px;
+  overflow: hidden;
+}
+.col-menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 9px 14px;
+  font-size: 0.85rem;
+  color: var(--text);
+  cursor: pointer;
+  font-family: inherit;
+}
+.col-menu-item:hover { background: var(--hover); }
+.col-menu-danger { color: #e8315a; }
+
+/* Collection color picker */
+.col-color-panel {
+  position: absolute;
+  top: -8px;
+  right: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  z-index: 200;
+  padding: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: 176px;
+}
+.col-color-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+}
+.col-color-swatch--active { border-color: var(--text); }
+.col-color-none {
+  font-size: 0.72rem;
+  color: var(--muted);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 8px;
   cursor: pointer;
   font-family: inherit;
 }
