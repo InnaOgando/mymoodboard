@@ -143,10 +143,11 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
       content,
       createdAt: Date.now()
     }
-    await saveElement(el, { skipRemote })
+    // Update UI immediately so the element appears even if the DB write is slow
     setElements(prev => [...prev, el])
     const editableTypes = ['idea', 'text', 'note', 'link', 'todo']
     if (editableTypes.includes(type)) setEditingId(el.id)
+    saveElement(el, { skipRemote }).catch(e => console.error('[addElement] saveElement failed:', e))
     return el
   }
 
@@ -188,10 +189,10 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
   async function undo() {
     const el = undoStack[undoStack.length - 1]
     if (!el) return
-    await saveElement(el)
     setElements(prev => [...prev, el])
     setUndoStack(prev => prev.slice(0, -1))
     if (undoStack.length <= 1) setUndoVisible(false)
+    saveElement(el).catch(e => console.error('[undo] saveElement failed:', e))
   }
 
   async function resizeElement(id, w, h) {
@@ -204,7 +205,6 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
 
   async function makeCollection(objectEl) {
     try {
-      await deleteElement(objectEl.id)
       const items = [{ id: uid(), type: objectEl.type, content: objectEl.content, w: objectEl.w, h: objectEl.h }]
       const col = {
         id: uid(), boardId, type: 'collection',
@@ -213,9 +213,10 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
         content: { items },
         createdAt: Date.now()
       }
-      await saveElement(col)
       setElements(prev => [...prev.filter(e => e.id !== objectEl.id), col])
       setSelectedId(null)
+      deleteElement(objectEl.id).catch(e => console.error('[makeCollection] deleteElement failed:', e))
+      saveElement(col).catch(e => console.error('[makeCollection] saveElement failed:', e))
     } catch (err) { console.error('makeCollection failed', err) }
   }
 
@@ -235,17 +236,16 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
       content: item.content,
       createdAt: Date.now()
     }
-    await saveElement(ejected)
 
     if (remaining.length === 0) {
-      // Auto-delete empty collection
-      await deleteElement(colId)
       setElements(prev => prev.filter(e => e.id !== colId).concat(ejected))
+      deleteElement(colId).catch(e => console.error('[eject] deleteElement failed:', e))
     } else {
       const updated = { ...col, content: { ...col.content, items: remaining } }
-      await saveElement(updated)
       setElements(prev => prev.map(e => e.id === colId ? updated : e).concat(ejected))
+      saveElement(updated).catch(e => console.error('[eject] saveElement(col) failed:', e))
     }
+    saveElement(ejected).catch(e => console.error('[eject] saveElement(ejected) failed:', e))
     setSelectedId(ejected.id)
   }
 
@@ -257,9 +257,9 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
       content: { ...col.content, items: getCollectionItems(col.content).map(item => ({ ...item, id: uid() })) },
       createdAt: Date.now()
     }
-    await saveElement(newCol)
     setElements(prev => [...prev, newCol])
     setSelectedId(newCol.id)
+    saveElement(newCol).catch(e => console.error('[duplicateCollection] saveElement failed:', e))
   }
 
   // Drop a canvas element into a collection (shared logic for drag-end and tap-fallback)
