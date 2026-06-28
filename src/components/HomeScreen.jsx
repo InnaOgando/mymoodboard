@@ -10,13 +10,15 @@ function randomColor() {
   return PRESET_COLORS[Math.floor(Math.random() * PRESET_COLORS.length)]
 }
 
-// Place new board to the right of the rightmost board; wrap to a new row if needed
-function findNextBoardPos(boards) {
-  const BOARD_W = 148
-  const BOARD_H = 130
+const BOARD_W = 148
+const BOARD_H = 130
+
+// Place new board to the right of the rightmost board; wrap to a new row if needed.
+// viewportW is the usable canvas width in canvas coordinates.
+function findNextBoardPos(boards, viewportW = 800) {
   const GAP = 24
-  const MAX_ROW_X = 640
   const START = { x: 80, y: 80 }
+  const MAX_ROW_X = Math.max(viewportW - BOARD_W - GAP, START.x + BOARD_W)
 
   if (!boards.length) return START
 
@@ -51,6 +53,8 @@ export default function HomeScreen({ onOpenBoard, session }) {
   const [showRename, setShowRename] = useState(false)
   const [renameValue, setRenameValue] = useState('')
   const scaleRef = useRef(1)
+  const canvasContainerRef = useRef()
+  const canvasOffsetRef = useRef({ x: 40, y: 40 })
   const boardsRef = useRef([])
 
   useEffect(() => { boardsRef.current = boards }, [boards])
@@ -61,10 +65,17 @@ export default function HomeScreen({ onOpenBoard, session }) {
     setBoards(list)
   }
 
+  function getViewportW() {
+    const el = canvasContainerRef.current
+    if (!el) return 800
+    const scale = scaleRef.current || 1
+    return el.getBoundingClientRect().width / scale
+  }
+
   async function createBoard() {
     const name = newName.trim()
     if (!name) { alert('Please type a name first'); return }
-    const pos = findNextBoardPos(boardsRef.current)
+    const pos = findNextBoardPos(boardsRef.current, getViewportW())
     const board = {
       id: uid(),
       parentId: null,
@@ -124,7 +135,7 @@ export default function HomeScreen({ onOpenBoard, session }) {
         <button className="logout-btn" title="Sair" onClick={() => supabase.auth.signOut()}>↪</button>
       </header>
 
-      <Canvas onClick={handleCanvasClick} scaleRef={scaleRef}>
+      <Canvas onClick={handleCanvasClick} scaleRef={scaleRef} containerRef={canvasContainerRef} offsetRef={canvasOffsetRef}>
         {boards.map(board => (
           <DraggableCard
             key={board.id}

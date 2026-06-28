@@ -230,11 +230,18 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
     if (!item) return
     const remaining = items.filter(i => i.id !== itemId)
 
+    const ejW = item.w || 150
+    const ejH = item.h || 170
+    const ejectPos = findFreePosition(
+      elementsRef.current.filter(e => e.id !== colId),
+      childBoardsRef.current,
+      getViewport(),
+      ejW, ejH
+    )
     const ejected = {
       id: uid(), boardId, type: item.type,
-      x: col.x + (col.w || 150) + 32, y: col.y,
-      w: item.w || 150,
-      h: item.h,
+      x: ejectPos.x, y: ejectPos.y,
+      w: ejW, h: item.h,
       content: item.content,
       createdAt: Date.now()
     }
@@ -292,11 +299,11 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
     for (const col of cols) {
       const items = getCollectionItems(col.content)
       const colW = col.w || 260
-      // Match the CSS grid: 120px thumbs, 4px gap, 16px total horizontal padding
-      const THUMB = 120, GAP = 4, PAD = 16
-      const gridCols = Math.max(1, Math.floor((colW - PAD + GAP) / (THUMB + GAP)))
-      const gridRows = Math.ceil(Math.max(1, items.length) / gridCols)
-      const colH = gridRows * (THUMB + GAP) + 50 // 50px covers header + bottom pad
+      // Collection renders as a flex column. Heights vary by content type.
+      // Use a generous per-item estimate (images can be tall) plus header.
+      const HEADER = 44
+      const PER_ITEM = 180
+      const colH = HEADER + Math.max(1, items.length) * PER_ITEM
       if (cx >= col.x && cx <= col.x + colW && cy >= col.y && cy <= col.y + colH) {
         return col.id
       }
