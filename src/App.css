@@ -954,8 +954,11 @@ body {
   max-width: none; /* override .el-card max-width so columns can exceed 2 */
 }
 
-/* .collection-items layout is now handled by SortableGrid (position: absolute items) */
-.collection-items { /* kept as selector hook for specificity — layout via SortableGrid */ }
+.collection-items {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
 
 .collection-empty {
   padding: 20px 12px;
@@ -968,15 +971,10 @@ body {
 .collection-item-wrap {
   position: relative;
   width: 100%;
-  height: 100%;
-  overflow: hidden;
-  border-radius: 4px;
-  background: #f0f0f0;
 }
 .collection-item-wrap img {
   width: 100%;
-  height: 100%;
-  object-fit: cover;
+  height: auto;
   display: block;
   pointer-events: none;
   user-select: none;
@@ -1317,78 +1315,58 @@ body {
 }
 
 /* ── Mini object previews inside Collection ── */
-/* Mini items fill the 120×120 collection cell */
+/* Mini items — natural height, full collection width */
 .mini-idea {
   display: flex;
-  flex-direction: column;
-  gap: 5px;
-  padding: 10px;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 8px 10px;
   background: var(--note-bg);
-  height: 100%;
-  box-sizing: border-box;
-  overflow: hidden;
 }
-.mini-idea-icon { font-size: 1rem; flex-shrink: 0; }
+.mini-idea-icon { font-size: 0.85rem; flex-shrink: 0; margin-top: 1px; }
 .mini-idea-text {
-  font-size: 0.8rem;
+  font-size: 0.82rem;
   line-height: 1.4;
   color: var(--text);
   word-break: break-word;
-  display: -webkit-box;
-  -webkit-line-clamp: 4;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-.mini-link {
-  padding: 10px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 4px;
-  height: 100%;
-  box-sizing: border-box;
-  background: #f0f4ff;
-  overflow: hidden;
-}
-.mini-link-title {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--text);
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.mini-link-url {
-  font-size: 0.7rem;
-  color: #2563eb;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-/* Palette: 3-column swatch grid filling the square */
-.mini-palette {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 3px;
-  padding: 6px;
-  height: 100%;
-  box-sizing: border-box;
-  align-content: start;
-}
-.mini-swatch {
-  aspect-ratio: 1;
-  width: 100%;
-  border-radius: 3px;
-}
-.mini-todo {
+.mini-link {
   padding: 8px 10px;
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  height: 100%;
-  box-sizing: border-box;
-  overflow: hidden;
+  gap: 2px;
+}
+.mini-link-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.mini-link-url {
+  font-size: 0.72rem;
+  color: #2563eb;
+  text-decoration: underline;
+}
+.mini-palette {
+  display: flex;
+  gap: 4px;
+  padding: 8px 10px;
+  flex-wrap: wrap;
+}
+.mini-swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.mini-todo {
+  padding: 6px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 .mini-todo-item {
   display: flex;

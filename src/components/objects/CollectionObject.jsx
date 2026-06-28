@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import ResizeHandle from '../ResizeHandle'
-import SortableGrid from '../SortableGrid'
 import CachedImage from './CachedImage'
 import { getPaletteColors } from './PaletteObject'
 import { PRESET_COLORS } from '../../colors'
@@ -27,12 +26,19 @@ function shortUrl(url) {
   } catch { return url.slice(0, 24) + '…' }
 }
 
-// Compact read-only thumbnail preview of any object type inside the collection
-function MiniObject({ item }) {
+// Full-fidelity preview — objects display at their natural size inside the collection
+function CollectionItem({ item }) {
   const type = normalizeType(item.type)
   switch (type) {
     case 'image':
-      return <CachedImage src={item.content.src} hash={item.content.hash} />
+      return (
+        <CachedImage
+          src={item.content.src}
+          hash={item.content.hash}
+          style={{ width: '100%', display: 'block' }}
+          draggable={false}
+        />
+      )
     case 'idea':
       return (
         <div className="mini-idea">
@@ -87,14 +93,9 @@ export default function CollectionObject({
   const [showMenu, setShowMenu] = useState(false)
   const [showColors, setShowColors] = useState(false)
 
-  // Close menu/color picker when deselected
   useEffect(() => {
     if (!selected) { setShowMenu(false); setShowColors(false) }
   }, [selected])
-
-  function handleReorder(newItems) {
-    onUpdate?.({ ...el.content, items: newItems })
-  }
 
   function handleRename() {
     const next = prompt('Collection name:', label)
@@ -111,7 +112,6 @@ export default function CollectionObject({
   return (
     <div style={{ position: 'relative', width: w }}>
 
-      {/* ⋯ menu dropdown */}
       {selected && showMenu && (
         <div className="col-menu-dropdown" onPointerDown={e => e.stopPropagation()}>
           <button className="col-menu-item" onClick={e => { e.stopPropagation(); handleRename() }}>Rename</button>
@@ -121,7 +121,6 @@ export default function CollectionObject({
         </div>
       )}
 
-      {/* Color picker panel */}
       {selected && showColors && (
         <div className="col-color-panel" onPointerDown={e => e.stopPropagation()}>
           {PRESET_COLORS.map(c => (
@@ -139,17 +138,11 @@ export default function CollectionObject({
 
       <div
         className={`el-card el-collection ${selected ? 'selected' : ''} ${isDropTarget ? 'drop-target' : ''}`}
-        style={{
-          width: w,
-          borderColor: accentColor || undefined,
-        }}
+        style={{ width: w, borderColor: accentColor || undefined }}
       >
-        <div
-          className="drag-handle"
-          style={{ background: accentColor ? `${accentColor}1a` : undefined }}
-        >
+        <div className="drag-handle" style={{ background: accentColor ? `${accentColor}1a` : undefined }}>
           <span className="handle-dots">⠿</span>
-          <span className="column-label">{label}{selected && items.length > 0 ? ' · drag to reorder' : ''}</span>
+          <span className="column-label">{label}</span>
           {selected && (
             <button
               className="col-menu-btn"
@@ -162,32 +155,21 @@ export default function CollectionObject({
         {items.length === 0 ? (
           <div className="collection-empty">Drag objects here</div>
         ) : (
-          <SortableGrid
-            items={items}
-            cellSize={120}
-            gap={4}
-            padTop={6}
-            padRight={8}
-            padBottom={8}
-            padLeft={8}
-            disabled={!selected}
-            onReorder={handleReorder}
-            renderItem={(item) => (
-              <div className="collection-item-wrap">
-                <MiniObject item={item} />
+          <div className="collection-items">
+            {items.map(item => (
+              <div key={item.id} className="collection-item-wrap">
+                <CollectionItem item={item} />
                 {selected && (
                   <button
                     className="col-img-eject"
                     onPointerDown={e => e.stopPropagation()}
                     onClick={e => { e.stopPropagation(); onEjectItem?.(item.id) }}
                     title="Move to canvas"
-                  >
-                    ↗
-                  </button>
+                  >↗</button>
                 )}
               </div>
-            )}
-          />
+            ))}
+          </div>
         )}
 
         {selected && (
