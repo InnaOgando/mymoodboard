@@ -1,9 +1,10 @@
 import ResizeHandle from '../ResizeHandle'
-import { useLazyImage } from '../../ImageImportService.js'
+import { useCachedImage } from '../../ImageImportService.js'
 
 export default function ImageObject({ el, selected, onDelete, onResize, onMakeCollection, scaleRef }) {
   const w = el.w || 150
-  const { ref, loaded, visibleSrc, placeholderSrc } = useLazyImage(el.content.src)
+  // Always prefer local Blob cache; falls back to remote src if not cached locally
+  const { ref, loaded, visibleSrc, placeholderSrc } = useCachedImage(el.content.src, el.content.hash)
 
   return (
     <div style={{ position: 'relative', width: w }}>

@@ -1,9 +1,19 @@
 import { useRef, useEffect, useLayoutEffect, useState } from 'react'
 
-export default function Canvas({ children, onClick, scaleRef: externalScaleRef }) {
-  const containerRef = useRef()
+export default function Canvas({
+  children,
+  onClick,
+  scaleRef: externalScaleRef,
+  // Optional refs that the parent can pass to read pan offset and container bounds.
+  // Canvas writes to them; parent can read them at any time (e.g. for viewport placement).
+  offsetRef: externalOffsetRef,
+  containerRef: externalContainerRef,
+}) {
+  const internalContainerRef = useRef()
+  const containerRef = externalContainerRef ?? internalContainerRef
   const innerRef = useRef()
-  const offsetRef = useRef({ x: 40, y: 40 })
+  const internalOffsetRef = useRef({ x: 40, y: 40 })
+  const offsetRef = externalOffsetRef ?? internalOffsetRef
   const internalScaleRef = useRef(1)
   const scaleRef = externalScaleRef || internalScaleRef
 

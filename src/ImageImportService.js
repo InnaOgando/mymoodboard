@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from './supabase'
-import { getCachedImage, setCachedImage, saveElement, getDB } from './db'
+import { getCachedBlob, setCachedImage, saveElement, getDB } from './db'
 
 const IMAGE_CONFIG = {
   MAX_PX: 512,
@@ -37,7 +37,6 @@ export async function optimize(input) {
   ctx.drawImage(bitmap, 0, 0, w, h)
   bitmap.close()
 
-  // Adaptive compression: step quality down until under TARGET_BYTES or QUALITY_MIN reached
   const stepInt  = Math.round(IMAGE_CONFIG.QUALITY_STEP  * 100)
   const minInt   = Math.round(IMAGE_CONFIG.QUALITY_MIN   * 100)
   let qualityInt = Math.round(IMAGE_CONFIG.QUALITY_START * 100)
@@ -77,24 +76,6 @@ function _canvasToBlob(canvas, type, quality) {
   })
 }
 
-function _blobToDataUrl(blob) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(reader.result)
-    reader.onerror = reject
-    reader.readAsDataURL(blob)
-  })
-}
-
-function _dataUrlToBlob(dataUrl) {
-  const [header, b64] = dataUrl.split(',')
-  const mime = header.match(/:(.*?);/)[1]
-  const bytes = atob(b64)
-  const arr = new Uint8Array(bytes.length)
-  for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i)
-  return new Blob([arr], { type: mime })
-}
-
 // ── 2. SHA-256 deduplication ─────────────────────────────────────────────────
 
 export async function sha256Hex(blob) {
@@ -103,7 +84,7 @@ export async function sha256Hex(blob) {
   return Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2, '0')).join('')
 }
 
-async function _findExistingUrl(hash, userId) {
+async function _findExistingRemoteUrl(hash, userId) {
   const { data } = await supabase
     .from('elements')
     .select('content')
@@ -113,7 +94,7 @@ async function _findExistingUrl(hash, userId) {
     .limit(1)
   if (data && data.length > 0) {
     const src = data[0].content?.src
-    // Only return a remote URL, not a stale dataUrl from a previous offline session
+    // Only return a confirmed remote URL — skip null or legacy dataUrls
     if (src && src.startsWith('http')) return src
   }
   return null
@@ -138,48 +119,53 @@ async function _uploadWebp(blob, userId, hash) {
 // ── Main entry point ──────────────────────────────────────────────────────────
 
 /**
- * Full pipeline: optimize → cache locally → upload when online.
+ * Full import pipeline: optimize → cache locally as Blob → upload when online.
  *
- * When offline: returns the local dataUrl as `src` and sets `pendingUpload: true`.
- * The dataUrl is saved to the element's content.src temporarily.
- * Call flushPendingImageUploads() on reconnect to swap it for the remote URL.
+ * The local Blob is stored permanently in IndexedDB regardless of network state.
+ * Supabase is synchronisation and backup only.
+ *
+ * When offline:
+ *   Returns { src: null, hash, syncStatus: 'pending', ... }
+ *   The local Blob is the working copy. Upload happens on reconnect.
+ *
+ * When online:
+ *   Returns { src: remoteUrl, hash, syncStatus: 'synced', ... }
+ *   The local Blob is still kept. Rendering always prefers local first.
  *
  * @param {File|Blob|string} input
- * @returns {{ src: string, hash: string, width: number, height: number, sizeBytes: number, pendingUpload?: boolean }}
+ * @returns {{ src: string|null, hash: string, width: number, height: number, sizeBytes: number, syncStatus: 'synced'|'pending' }}
  */
 export async function processAndUpload(input) {
   const { blob, width, height, sizeBytes } = await optimize(input)
   const hash = await sha256Hex(blob)
 
-  // Always cache the optimised WebP locally so images display even offline
-  const dataUrl = await _blobToDataUrl(blob)
-  await setCachedImage(hash, dataUrl)
+  // Always cache the Blob locally first — this is the permanent working copy
+  await setCachedImage(hash, blob)
 
-  // Auth session is stored locally by Supabase — this works offline
+  // Auth session is in local storage — works offline
   const { data: { session } } = await supabase.auth.getSession()
   const userId = session?.user?.id
-
   if (!userId) throw new Error('Not authenticated')
 
   if (!navigator.onLine) {
-    // Offline: return dataUrl as temporary src; upload will happen on reconnect
-    return { src: dataUrl, hash, width, height, sizeBytes, pendingUpload: true }
+    return { src: null, hash, width, height, sizeBytes, syncStatus: 'pending' }
   }
 
   try {
-    const existingUrl = await _findExistingUrl(hash, userId)
-    if (existingUrl) return { src: existingUrl, hash, width, height, sizeBytes }
+    const existingUrl = await _findExistingRemoteUrl(hash, userId)
+    if (existingUrl) return { src: existingUrl, hash, width, height, sizeBytes, syncStatus: 'synced' }
     const src = await _uploadWebp(blob, userId, hash)
-    return { src, hash, width, height, sizeBytes }
+    return { src, hash, width, height, sizeBytes, syncStatus: 'synced' }
   } catch (e) {
-    console.warn('[ImageImportService] upload failed, using local dataUrl:', e.message)
-    return { src: dataUrl, hash, width, height, sizeBytes, pendingUpload: true }
+    console.warn('[ImageImportService] upload failed, will retry on reconnect:', e.message)
+    return { src: null, hash, width, height, sizeBytes, syncStatus: 'pending' }
   }
 }
 
 /**
- * Upload all images whose src is still a local dataUrl (from an offline session).
- * Called on app startup and whenever the browser comes online.
+ * Upload pending images when back online.
+ * Sets content.src to the remote URL and syncStatus to 'synced'.
+ * The local Blob is NEVER removed — IndexedDB is the working database.
  */
 export async function flushPendingImageUploads() {
   if (!navigator.onLine) return
@@ -189,8 +175,8 @@ export async function flushPendingImageUploads() {
 
   const db = await getDB()
   const allElements = await db.getAll('elements')
-  const pending = allElements.filter(el =>
-    el.type === 'image' && el.content?.src?.startsWith('data:') && el.content?.hash
+  const pending = allElements.filter(
+    el => el.type === 'image' && el.content?.syncStatus === 'pending' && el.content?.hash
   )
 
   if (pending.length === 0) return
@@ -199,15 +185,14 @@ export async function flushPendingImageUploads() {
   for (const el of pending) {
     const { hash } = el.content
     try {
-      // Re-use existing upload if another session already uploaded this hash
-      let remoteUrl = await _findExistingUrl(hash, userId)
+      let remoteUrl = await _findExistingRemoteUrl(hash, userId)
       if (!remoteUrl) {
-        const cached = await getCachedImage(hash)
-        if (!cached) continue
-        const blob = _dataUrlToBlob(cached)
+        const blob = await getCachedBlob(hash)
+        if (!blob) { console.warn('[ImageImportService] no cached blob for hash:', hash); continue }
         remoteUrl = await _uploadWebp(blob, userId, hash)
       }
-      const updated = { ...el, content: { ...el.content, src: remoteUrl } }
+      // Update src and syncStatus — local Blob stays in imageCache permanently
+      const updated = { ...el, content: { ...el.content, src: remoteUrl, syncStatus: 'synced' } }
       await saveElement(updated)
     } catch (e) {
       console.warn('[ImageImportService] flush failed for hash:', hash, e.message)
@@ -218,11 +203,11 @@ export async function flushPendingImageUploads() {
 // ── 4. Orphan cleanup ─────────────────────────────────────────────────────────
 
 /**
- * Delete image from Storage only if no other elements (besides currentElementId) reference it.
+ * Delete from Supabase Storage if no other element references this image.
+ * Never touches the local Blob cache.
  */
 export async function deleteImageIfOrphaned(url, currentElementId) {
-  // Local dataUrls are not in Supabase Storage — skip
-  if (!url || url.startsWith('data:')) return
+  if (!url || !url.startsWith('http')) return  // local-only image, nothing to clean up
   try {
     const { data: { session } } = await supabase.auth.getSession()
     const userId = session?.user?.id
@@ -251,19 +236,50 @@ export async function deleteImageIfOrphaned(url, currentElementId) {
   }
 }
 
-// ── 5. Lazy loading hook ──────────────────────────────────────────────────────
+// ── 5. Image rendering hook ───────────────────────────────────────────────────
+//
+// Rendering priority:
+//   1. Local Blob (ObjectURL) — immediate, works offline
+//   2. Remote URL              — fallback when not cached locally
+//
+// Includes IntersectionObserver for lazy loading.
 
 const PLACEHOLDER_SVG = `data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='1' height='1'><rect width='1' height='1' fill='%23f0f0f0'/></svg>`
 
 /**
- * @param {string|null} src
- * @returns {{ ref: React.RefObject, loaded: boolean, visibleSrc: string|null, placeholderSrc: string }}
+ * Hook that returns the best available image source.
+ * Always prefers the local Blob cache over the remote URL.
+ *
+ * @param {string|null} remoteSrc  — el.content.src (remote URL or null)
+ * @param {string|null} hash       — el.content.hash (SHA-256)
  */
-export function useLazyImage(src) {
+export function useCachedImage(remoteSrc, hash) {
   const ref = useRef(null)
   const [visible, setVisible] = useState(false)
   const [loaded, setLoaded] = useState(false)
+  // ObjectURL created from the cached Blob — revoked on cleanup
+  const [blobUrl, setBlobUrl] = useState(null)
 
+  // Look up local Blob and create ObjectURL
+  useEffect(() => {
+    if (!hash) return
+    let latestUrl = null
+    let cancelled = false
+
+    getCachedBlob(hash).then(blob => {
+      if (cancelled || !blob) return
+      const url = URL.createObjectURL(blob)
+      latestUrl = url
+      setBlobUrl(url)
+    })
+
+    return () => {
+      cancelled = true
+      if (latestUrl) URL.revokeObjectURL(latestUrl)
+    }
+  }, [hash])
+
+  // Intersection observer for lazy loading (avoids loading off-screen images)
   useEffect(() => {
     if (!ref.current) return
     const el = ref.current
@@ -275,29 +291,28 @@ export function useLazyImage(src) {
     return () => observer.disconnect()
   }, [])
 
+  // The best available src: local blob URL > remote URL > null
+  const displaySrc = blobUrl || remoteSrc
+
   useEffect(() => {
-    if (!visible || !src) return
+    if (!visible || !displaySrc) return
     setLoaded(false)
     const img = new Image()
     img.onload = () => setLoaded(true)
     img.onerror = () => setLoaded(true)
-    img.src = src
-  }, [visible, src])
+    img.src = displaySrc
+  }, [visible, displaySrc])
 
   return {
     ref,
     loaded,
-    visibleSrc: visible ? src : null,
+    visibleSrc: visible ? displaySrc : null,
     placeholderSrc: PLACEHOLDER_SVG,
   }
 }
 
 // ── 6. Storage statistics ─────────────────────────────────────────────────────
 
-/**
- * @param {string} userId
- * @returns {{ references: number, totalBytes: number, averageBytes: number, totalMB: string }}
- */
 export async function getStorageStats(userId) {
   const { data, error } = await supabase
     .from('elements')

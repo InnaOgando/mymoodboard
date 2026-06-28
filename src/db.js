@@ -63,18 +63,64 @@ async function currentUserId() {
 }
 
 // ── Image cache ───────────────────────────────────────────────────────────────
+// Blobs are stored directly — no base64 encoding overhead.
+// IndexedDB supports Blob natively since Safari 14 / iOS 14.
 
-/** Store an optimised WebP dataUrl by hash so images work offline. */
-export async function setCachedImage(hash, dataUrl) {
+/** Store an optimised WebP Blob by SHA-256 hash. */
+export async function setCachedImage(hash, blob) {
   const db = await getDB()
-  await db.put('imageCache', { hash, dataUrl })
+  await db.put('imageCache', { hash, blob, cachedAt: Date.now() })
 }
 
-/** Retrieve a locally cached image dataUrl. Returns null if not cached. */
-export async function getCachedImage(hash) {
+/** Retrieve the cached Blob for a given hash. Returns null if not found. */
+export async function getCachedBlob(hash) {
   const db = await getDB()
   const row = await db.get('imageCache', hash)
-  return row?.dataUrl ?? null
+  if (!row) return null
+  // Current format: { hash, blob }
+  if (row.blob instanceof Blob) return row.blob
+  // Legacy format from v3.0 (stored dataUrl before this was updated):
+  // convert once and re-save as Blob so future reads are fast.
+  if (row.dataUrl && typeof row.dataUrl === 'string') {
+    const blob = _dataUrlToBlob(row.dataUrl)
+    await db.put('imageCache', { hash, blob, cachedAt: row.cachedAt || Date.now() })
+    return blob
+  }
+  return null
+}
+
+function _dataUrlToBlob(dataUrl) {
+  const [header, b64] = dataUrl.split(',')
+  const mime = header.match(/:(.*?);/)[1]
+  const bytes = atob(b64)
+  const arr = new Uint8Array(bytes.length)
+  for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i)
+  return new Blob([arr], { type: mime })
+}
+
+// ── Debug stats ───────────────────────────────────────────────────────────────
+
+/** Return diagnostic information for the DebugPanel. */
+export async function getDebugStats() {
+  const db = await getDB()
+  const [boards, elements, imageCache, pendingOps] = await Promise.all([
+    db.getAll('boards'),
+    db.getAll('elements'),
+    db.getAll('imageCache'),
+    db.getAll('pendingOps'),
+  ])
+  const cacheBytes = imageCache.reduce((sum, row) => sum + (row.blob?.size || 0), 0)
+  const pendingUploads = elements.filter(
+    el => el.type === 'image' && el.content?.syncStatus === 'pending'
+  ).length
+  return {
+    boards: boards.length,
+    elements: elements.length,
+    cachedImages: imageCache.length,
+    cacheBytes,
+    pendingOps: pendingOps.length,
+    pendingUploads,
+  }
 }
 
 // ── Pending operations ────────────────────────────────────────────────────────

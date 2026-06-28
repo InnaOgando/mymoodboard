@@ -1,13 +1,9 @@
 import { useState, useEffect } from 'react'
 import ResizeHandle from '../ResizeHandle'
 import SortableGrid from '../SortableGrid'
+import CachedImage from './CachedImage'
 import { getPaletteColors } from './PaletteObject'
-
-// Shared preset colors for collection borders/headers
-const COLLECTION_COLORS = [
-  '#e8315a', '#f4845f', '#f7c948', '#4caf82',
-  '#4a90d9', '#a78bfa', '#f9a8d4', '#94a3b8',
-]
+import { PRESET_COLORS } from '../../colors'
 
 function normalizeType(type) {
   if (type === 'text' || type === 'note') return 'idea'
@@ -36,7 +32,7 @@ function MiniObject({ item }) {
   const type = normalizeType(item.type)
   switch (type) {
     case 'image':
-      return <img src={item.content.src} alt="" draggable={false} />
+      return <CachedImage src={item.content.src} hash={item.content.hash} />
     case 'idea':
       return (
         <div className="mini-idea">
@@ -128,7 +124,7 @@ export default function CollectionObject({
       {/* Color picker panel */}
       {selected && showColors && (
         <div className="col-color-panel" onPointerDown={e => e.stopPropagation()}>
-          {COLLECTION_COLORS.map(c => (
+          {PRESET_COLORS.map(c => (
             <button
               key={c}
               className={`col-color-swatch ${accentColor === c ? 'col-color-swatch--active' : ''}`}

@@ -5,7 +5,10 @@ import BoardScreen from './components/BoardScreen'
 import AuthScreen from './components/AuthScreen'
 import { flushPendingOps } from './db'
 import { flushPendingImageUploads } from './ImageImportService'
+import DebugPanel from './components/DebugPanel'
 import './App.css'
+
+const SHOW_DEBUG = new URLSearchParams(window.location.search).get('debug') === '1'
 
 async function syncOnline() {
   await flushPendingOps()
@@ -151,6 +154,7 @@ export default function App() {
       ) : (
         <HomeScreen onOpenBoard={openBoard} session={session} />
       )}
+      {SHOW_DEBUG && <DebugPanel />}
     </div>
   )
 }

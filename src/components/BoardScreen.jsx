@@ -9,10 +9,30 @@ import ObjectRenderer, { normalizeType } from './ObjectRenderer'
 import { getCollectionItems } from './objects/CollectionObject'
 import { processAndUpload, deleteImageIfOrphaned } from '../storage.js'
 
-// ── Smart placement ───────────────────────────────────────────────────────────
-// Find a non-overlapping canvas position near `hint`.
-function findFreePosition(existingElements, childBoards, hint, objW = 170, objH = 190) {
-  const GAP = 24
+// ── Viewport-aware placement ──────────────────────────────────────────────────
+// Computes the current visible canvas area so new objects always land in view.
+// canvasContainerRef and canvasOffsetRef are passed to <Canvas> and written by it.
+
+function makeViewportBounds(containerRef, offsetRef, scaleRef) {
+  const container = containerRef.current
+  if (!container) return { x: 80, y: 80, w: 800, h: 600 }
+  const rect = container.getBoundingClientRect()
+  const scale = scaleRef.current || 1
+  const { x: ox, y: oy } = offsetRef.current
+  return {
+    x: -ox / scale,
+    y: -oy / scale,
+    w: rect.width  / scale,
+    h: rect.height / scale,
+  }
+}
+
+// Scan the current viewport L→R, top-to-bottom and return the first empty slot.
+// Never places an object outside the user's visible area.
+function findFreePosition(existingElements, childBoards, viewportBounds, objW = 170, objH = 190) {
+  const GAP = 20
+  const MARGIN = 40
+
   const allBoxes = [
     ...existingElements.map(el => ({ x: el.x, y: el.y, w: el.w || objW, h: el.h || objH })),
     ...childBoards.map(b => ({ x: b.x, y: b.y, w: 148, h: 130 })),
@@ -25,19 +45,23 @@ function findFreePosition(existingElements, childBoards, hint, objW = 170, objH 
     )
   }
 
-  // Try hint first
-  if (!overlaps(hint.x, hint.y)) return hint
+  const startX = viewportBounds.x + MARGIN
+  const startY = viewportBounds.y + MARGIN
+  const endX   = viewportBounds.x + viewportBounds.w - MARGIN - objW
+  const endY   = viewportBounds.y + viewportBounds.h - MARGIN - objH
 
-  // Spiral outward in a grid pattern
-  for (let row = 0; row <= 6; row++) {
-    for (let col = -3; col <= 6; col++) {
-      const x = Math.max(20, hint.x + col * (objW + GAP))
-      const y = Math.max(20, hint.y + row * (objH + GAP))
-      if (!overlaps(x, y)) return { x, y }
+  let y = startY
+  while (y <= endY) {
+    let x = startX
+    while (x <= endX) {
+      if (!overlaps(x, y)) return { x: Math.round(x), y: Math.round(y) }
+      x += objW + GAP
     }
+    y += objH + GAP
   }
 
-  return { x: hint.x, y: hint.y + (objH + GAP) * 4 }
+  // Viewport full — overflow downward from start
+  return { x: Math.round(startX), y: Math.round(startY + viewportBounds.h) }
 }
 
 export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, onHome }) {
@@ -47,7 +71,6 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
   const [selectedId, setSelectedId] = useState(null)
   const [editingId, setEditingId] = useState(null)
   const [showImagePicker, setShowImagePicker] = useState(false)
-  const [pendingPos, setPendingPos] = useState({ x: 80, y: 80 })
   const [dropOverCollectionId, _setDropOverCollectionId] = useState(null)
   const [undoStack, setUndoStack] = useState([])
   const [undoVisible, setUndoVisible] = useState(false)
@@ -60,6 +83,9 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
 
   const undoTimer = useRef(null)
   const scaleRef = useRef(1)
+  // Exposed to Canvas so we can compute viewport bounds for placement
+  const canvasContainerRef = useRef()
+  const canvasOffsetRef = useRef({ x: 40, y: 40 })
   const fileRef = useRef()
   const docRef = useRef()
   const importRef = useRef()
@@ -73,6 +99,10 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
   useEffect(() => { childBoardsRef.current = childBoards }, [childBoards])
   useEffect(() => { load() }, [boardId])
 
+  function getViewport() {
+    return makeViewportBounds(canvasContainerRef, canvasOffsetRef, scaleRef)
+  }
+
   // Desktop paste (Cmd+V)
   useEffect(() => {
     async function handlePaste(e) {
@@ -83,7 +113,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
       const blob = imgItem.getAsFile()
       try {
         const meta = await processAndUpload(blob)
-        const pos = findFreePosition(elementsRef.current, childBoardsRef.current, pendingPos, 160, 200)
+        const pos = findFreePosition(elementsRef.current, childBoardsRef.current, getViewport(), 160, 200)
         await addElement('image', pos, meta)
       } catch (err) {
         console.warn('[paste] processAndUpload failed:', err)
@@ -91,7 +121,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
     }
     document.addEventListener('paste', handlePaste)
     return () => document.removeEventListener('paste', handlePaste)
-  }, [pendingPos, boardId])
+  }, [boardId])
 
   async function load() {
     const b = await getBoard(boardId)
@@ -221,7 +251,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
   async function duplicateCollection(col) {
     const newCol = {
       id: uid(), boardId, type: 'collection',
-      x: col.x + 30, y: col.y + 30,
+      x: col.x + 40, y: col.y + 40,
       w: col.w,
       content: { ...col.content, items: getCollectionItems(col.content).map(item => ({ ...item, id: uid() })) },
       createdAt: Date.now()
@@ -287,15 +317,14 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
     setChildBoards(prev => prev.filter(b => b.id !== id))
   }
 
-  async function handleNavAction(type, pos) {
-    const hint = pos || pendingPos
+  async function handleNavAction(type) {
+    const vp = getViewport()
     if (type === 'image') {
-      setPendingPos(hint)
       setShowImagePicker(true)
     } else if (type === 'board') {
       const name = prompt('Board name:')
       if (!name) return
-      const bPos = findFreePosition(elementsRef.current, childBoardsRef.current, hint, 148, 130)
+      const bPos = findFreePosition(elementsRef.current, childBoardsRef.current, vp, 148, 130)
       const newBoard = {
         id: uid(), parentId: boardId, name: name.trim(),
         color: '#e8315a',
@@ -304,15 +333,14 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
       await saveBoard(newBoard)
       setChildBoards(prev => [...prev, newBoard])
     } else if (type === 'document') {
-      setPendingPos(hint)
       docRef.current.click()
     } else if (type === 'palette') {
-      const freePos = findFreePosition(elementsRef.current, childBoardsRef.current, hint, 200, 90)
+      const freePos = findFreePosition(elementsRef.current, childBoardsRef.current, vp, 200, 90)
       await addElement('palette', freePos, {
         colors: ['#e8315a', '#f4845f', '#f7c948', '#4caf82', '#4a90d9']
       })
     } else {
-      const freePos = findFreePosition(elementsRef.current, childBoardsRef.current, hint)
+      const freePos = findFreePosition(elementsRef.current, childBoardsRef.current, vp)
       await addElement(type, freePos)
     }
   }
@@ -320,12 +348,13 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
   async function handleFiles(files) {
     const imgs = Array.from(files).filter(f => f.type.startsWith('image/'))
     const docs = Array.from(files).filter(f => f.type === 'application/pdf' || f.name.match(/\.(doc|docx)$/i))
+    const vp = getViewport()
 
     // Track newly-added elements so each subsequent image avoids the previous ones
     const added = []
     for (const img of imgs) {
       const allExisting = [...elementsRef.current, ...added]
-      const pos = findFreePosition(allExisting, childBoardsRef.current, pendingPos, 160, 200)
+      const pos = findFreePosition(allExisting, childBoardsRef.current, vp, 160, 200)
       try {
         const meta = await processAndUpload(img)
         const el = await addElement('image', pos, meta)
@@ -335,15 +364,16 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
       }
     }
     for (const f of docs) {
-      const pos = findFreePosition(elementsRef.current, childBoardsRef.current, pendingPos)
+      const pos = findFreePosition(elementsRef.current, childBoardsRef.current, vp)
       await addElement('document', pos, { name: f.name, type: f.type, src: await fileToBase64(f) })
     }
   }
 
   async function pasteFromClipboard() {
+    const vp = getViewport()
     const internal = sessionStorage.getItem('refmemo_copied_image')
     if (internal) {
-      const pos = findFreePosition(elementsRef.current, childBoardsRef.current, pendingPos, 160, 200)
+      const pos = findFreePosition(elementsRef.current, childBoardsRef.current, vp, 160, 200)
       addElement('image', pos, { src: internal })
       return
     }
@@ -356,7 +386,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
             const blob = await item.getType(imageType)
             try {
               const meta = await processAndUpload(blob)
-              const pos = findFreePosition(elementsRef.current, childBoardsRef.current, pendingPos, 160, 200)
+              const pos = findFreePosition(elementsRef.current, childBoardsRef.current, vp, 160, 200)
               await addElement('image', pos, meta)
             } catch (err) {
               console.warn('[pasteFromClipboard] processAndUpload failed:', err)
@@ -413,7 +443,12 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
         </button>
       </header>
 
-      <Canvas onClick={pos => { setPendingPos(pos); setSelectedId(null); setEditingId(null) }} scaleRef={scaleRef}>
+      <Canvas
+        onClick={() => { setSelectedId(null); setEditingId(null) }}
+        scaleRef={scaleRef}
+        offsetRef={canvasOffsetRef}
+        containerRef={canvasContainerRef}
+      >
 
         {childBoards.map(b => (
           <DraggableCard key={b.id} x={b.x} y={b.y} scaleRef={scaleRef}
@@ -476,7 +511,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
         ))}
       </Canvas>
 
-      <BottomNav onAction={handleNavAction} setPendingPos={setPendingPos} />
+      <BottomNav onAction={handleNavAction} />
 
       <input ref={fileRef} type="file" accept="image/*" multiple style={{ display: 'none' }}
         onChange={e => { handleFiles(Array.from(e.target.files)); e.target.value = '' }} />

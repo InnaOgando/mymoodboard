@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import SortableGrid from '../SortableGrid'
 import ResizeHandle from '../ResizeHandle'
+import { PRESET_COLORS } from '../../colors'
 
 // Backward compat: old `color` type used { color: '#hex' }
 export function getPaletteColors(content) {
@@ -153,19 +154,32 @@ export default function PaletteObject({ el, selected, onUpdate, onDelete, onMake
         {/* Color editor panel — appears below grid when a swatch is double-tapped */}
         {editMode && editingIdx !== null && colors[editingIdx] !== undefined && (
           <div className="palette-editor" onPointerDown={e => e.stopPropagation()}>
-            <input
-              type="color"
-              value={colors[editingIdx]}
-              className="palette-color-input"
-              onChange={e => changeColor(editingIdx, e.target.value)}
-            />
-            <div className="palette-codes">
-              <span className="palette-hex">{colors[editingIdx].toUpperCase()}</span>
-              <span className="palette-rgb">RGB {hexToRgb(colors[editingIdx])}</span>
+            {/* Preset quick-picks */}
+            <div className="palette-presets">
+              {PRESET_COLORS.map(c => (
+                <button
+                  key={c}
+                  className="palette-preset-swatch"
+                  style={{ background: c, outline: colors[editingIdx] === c ? '2px solid var(--text)' : 'none' }}
+                  onClick={e => { e.stopPropagation(); changeColor(editingIdx, c) }}
+                />
+              ))}
             </div>
-            <button className="palette-remove"
-              onClick={e => { e.stopPropagation(); removeColor(editingIdx) }}
-              title="Remove color">×</button>
+            <div className="palette-editor-row">
+              <input
+                type="color"
+                value={colors[editingIdx]}
+                className="palette-color-input"
+                onChange={e => changeColor(editingIdx, e.target.value)}
+              />
+              <div className="palette-codes">
+                <span className="palette-hex">{colors[editingIdx].toUpperCase()}</span>
+                <span className="palette-rgb">RGB {hexToRgb(colors[editingIdx])}</span>
+              </div>
+              <button className="palette-remove"
+                onClick={e => { e.stopPropagation(); removeColor(editingIdx) }}
+                title="Remove color">×</button>
+            </div>
           </div>
         )}
 

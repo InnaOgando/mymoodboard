@@ -4,11 +4,10 @@ import { getBoards, saveBoard, deleteBoard } from '../db'
 import { supabase } from '../supabase'
 import Canvas from './Canvas'
 import DraggableCard from './DraggableCard'
-
-const BOARD_COLORS = ['#e8315a', '#f4845f', '#f7c948', '#4caf82', '#4a90d9', '#9b6dd6', '#e91e8c', '#00bcd4']
+import { PRESET_COLORS } from '../colors'
 
 function randomColor() {
-  return BOARD_COLORS[Math.floor(Math.random() * BOARD_COLORS.length)]
+  return PRESET_COLORS[Math.floor(Math.random() * PRESET_COLORS.length)]
 }
 
 // Place new board to the right of the rightmost board; wrap to a new row if needed
@@ -235,7 +234,7 @@ export default function HomeScreen({ onOpenBoard, session }) {
           <div className="modal" onClick={e => e.stopPropagation()}>
             <h3>Board Color</h3>
             <div className="board-color-swatches" style={{ justifyContent: 'center', padding: '12px 0' }}>
-              {BOARD_COLORS.map(c => (
+              {PRESET_COLORS.map(c => (
                 <button
                   key={c}
                   className="board-swatch"
