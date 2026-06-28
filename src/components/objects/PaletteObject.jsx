@@ -47,48 +47,52 @@ export default function PaletteObject({ el, selected, onUpdate, onDelete, onMake
   const activeColor = editingIdx !== null ? colors[editingIdx] : null
 
   return (
-    <div className={`el-card el-palette ${selected ? 'selected' : ''}`}>
-      <div className="drag-handle">
-        <span className="handle-dots">⠿</span>
-        <span className="palette-label">Palette</span>
-        {selected && (
-          <>
-            <button className="handle-delete" onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onDelete() }}>×</button>
-          </>
-        )}
-      </div>
-
-      {/* Color swatches row */}
-      <div className="palette-swatches" onPointerDown={e => e.stopPropagation()}>
-        {colors.map((c, i) => (
-          <button
-            key={i}
-            className={`palette-swatch ${editingIdx === i ? 'active' : ''}`}
-            style={{ background: c }}
-            onClick={e => { e.stopPropagation(); setEditingIdx(editingIdx === i ? null : i) }}
-          />
-        ))}
-        {selected && colors.length < MAX_COLORS && (
-          <button className="palette-add" onClick={e => { e.stopPropagation(); addColor() }}>+</button>
-        )}
-      </div>
-
-      {/* Active color editor */}
-      {selected && editingIdx !== null && activeColor && (
-        <div className="palette-editor" onPointerDown={e => e.stopPropagation()}>
-          <input
-            type="color"
-            value={activeColor}
-            className="palette-color-input"
-            onChange={e => changeColor(editingIdx, e.target.value)}
-          />
-          <div className="palette-codes">
-            <span className="palette-hex">{activeColor.toUpperCase()}</span>
-            <span className="palette-rgb">RGB {hexToRgb(activeColor)}</span>
-          </div>
-          <button className="palette-remove" onClick={e => { e.stopPropagation(); removeColor(editingIdx) }} title="Remove this color">×</button>
+    <div style={{ position: 'relative' }}>
+      {selected && (
+        <div className="img-popup-menu" onPointerDown={e => e.stopPropagation()}>
+          <button className="img-popup-btn" onPointerDown={e => e.stopPropagation()}
+            onClick={e => { e.stopPropagation(); onMakeCollection?.() }}>+ Collection</button>
+          <button className="img-popup-btn img-popup-delete" onPointerDown={e => e.stopPropagation()}
+            onClick={e => { e.stopPropagation(); onDelete() }}>×</button>
         </div>
       )}
+
+      <div className={`el-card el-palette ${selected ? 'selected' : ''}`}>
+        <div className="drag-handle">
+          <span className="handle-dots">⠿</span>
+          <span className="palette-label">Palette</span>
+        </div>
+
+        <div className="palette-swatches" onPointerDown={e => e.stopPropagation()}>
+          {colors.map((c, i) => (
+            <button
+              key={i}
+              className={`palette-swatch ${editingIdx === i ? 'active' : ''}`}
+              style={{ background: c }}
+              onClick={e => { e.stopPropagation(); setEditingIdx(editingIdx === i ? null : i) }}
+            />
+          ))}
+          {selected && colors.length < MAX_COLORS && (
+            <button className="palette-add" onClick={e => { e.stopPropagation(); addColor() }}>+</button>
+          )}
+        </div>
+
+        {selected && editingIdx !== null && activeColor && (
+          <div className="palette-editor" onPointerDown={e => e.stopPropagation()}>
+            <input
+              type="color"
+              value={activeColor}
+              className="palette-color-input"
+              onChange={e => changeColor(editingIdx, e.target.value)}
+            />
+            <div className="palette-codes">
+              <span className="palette-hex">{activeColor.toUpperCase()}</span>
+              <span className="palette-rgb">RGB {hexToRgb(activeColor)}</span>
+            </div>
+            <button className="palette-remove" onClick={e => { e.stopPropagation(); removeColor(editingIdx) }} title="Remove this color">×</button>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

@@ -1000,7 +1000,7 @@ body {
 /* Legacy column label kept for compat */
 .column-label {
   font-size: 0.68rem;
-  color: var(--muted);
+  color: #555;
   text-transform: uppercase;
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -1029,7 +1029,7 @@ body {
 }
 .idea-label {
   font-size: 0.65rem;
-  color: var(--muted);
+  color: #555;
   text-transform: uppercase;
   font-weight: 700;
   letter-spacing: 0.05em;
@@ -1043,6 +1043,14 @@ body {
   font-weight: 500;
   min-height: 60px;
   resize: none;
+}
+.listening-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #e8315a;
+  flex-shrink: 0;
+  animation: pulse 1s infinite;
 }
 .idea-mic-btn {
   background: none;
@@ -1104,7 +1112,7 @@ body {
 }
 .palette-label {
   font-size: 0.65rem;
-  color: var(--muted);
+  color: #555;
   text-transform: uppercase;
   font-weight: 700;
   letter-spacing: 0.05em;

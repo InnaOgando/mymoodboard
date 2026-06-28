@@ -1,7 +1,6 @@
 import ResizeHandle from '../ResizeHandle'
 import { getPaletteColors } from './PaletteObject'
 
-// Normalize old type names to new ones (render only, never persisted)
 function normalizeType(type) {
   if (type === 'text' || type === 'note') return 'idea'
   if (type === 'color') return 'palette'
@@ -24,7 +23,6 @@ function shortUrl(url) {
   } catch { return url.slice(0, 24) + '…' }
 }
 
-// Compact read-only preview of any object type inside the collection
 function MiniObject({ item }) {
   const type = normalizeType(item.type)
   switch (type) {
@@ -91,57 +89,50 @@ export default function CollectionObject({ el, selected, isDropTarget, onDelete,
   const items = getCollectionItems(el.content)
 
   return (
-    <div
-      className={`el-card el-collection ${selected ? 'selected' : ''} ${isDropTarget ? 'drop-target' : ''}`}
-      style={{ width: w }}
-    >
-      <div className="drag-handle">
-        <span className="handle-dots">⠿</span>
-        <span className="column-label">Collection</span>
-        {selected && (
-          <>
-            <button
-              className="img-action-btn col-add-btn"
-              onPointerDown={e => e.stopPropagation()}
-              onClick={e => { e.stopPropagation(); onAddImage?.() }}
-            >
-              + Image
-            </button>
-            <button
-              className="handle-delete"
-              onPointerDown={e => e.stopPropagation()}
-              onClick={e => { e.stopPropagation(); onDelete() }}
-            >
-              ×
-            </button>
-          </>
-        )}
-      </div>
-
-      <div className="collection-items">
-        {items.length === 0 && (
-          <div className="collection-empty">Drag objects here</div>
-        )}
-        {items.map(item => (
-          <div key={item.id} className="collection-item-wrap">
-            <MiniObject item={item} />
-            {selected && (
-              <button
-                className="col-img-eject"
-                onPointerDown={e => e.stopPropagation()}
-                onClick={e => { e.stopPropagation(); onEjectItem?.(item.id) }}
-                title="Move to canvas"
-              >
-                ↗
-              </button>
-            )}
-          </div>
-        ))}
-      </div>
-
+    <div style={{ position: 'relative', width: w }}>
       {selected && (
-        <ResizeHandle w={w} h={null} onResize={nw => onResize(nw, null)} minW={80} scaleRef={scaleRef} />
+        <div className="img-popup-menu" onPointerDown={e => e.stopPropagation()}>
+          <button className="img-popup-btn" onPointerDown={e => e.stopPropagation()}
+            onClick={e => { e.stopPropagation(); onAddImage?.() }}>+ Image</button>
+          <button className="img-popup-btn img-popup-delete" onPointerDown={e => e.stopPropagation()}
+            onClick={e => { e.stopPropagation(); onDelete() }}>×</button>
+        </div>
       )}
+
+      <div
+        className={`el-card el-collection ${selected ? 'selected' : ''} ${isDropTarget ? 'drop-target' : ''}`}
+        style={{ width: w }}
+      >
+        <div className="drag-handle">
+          <span className="handle-dots">⠿</span>
+          <span className="column-label">Collection</span>
+        </div>
+
+        <div className="collection-items">
+          {items.length === 0 && (
+            <div className="collection-empty">Drag objects here</div>
+          )}
+          {items.map(item => (
+            <div key={item.id} className="collection-item-wrap">
+              <MiniObject item={item} />
+              {selected && (
+                <button
+                  className="col-img-eject"
+                  onPointerDown={e => e.stopPropagation()}
+                  onClick={e => { e.stopPropagation(); onEjectItem?.(item.id) }}
+                  title="Move to canvas"
+                >
+                  ↗
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {selected && (
+          <ResizeHandle w={w} h={null} onResize={nw => onResize(nw, null)} minW={80} scaleRef={scaleRef} />
+        )}
+      </div>
     </div>
   )
 }

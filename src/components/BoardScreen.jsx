@@ -9,6 +9,37 @@ import ObjectRenderer, { normalizeType } from './ObjectRenderer'
 import { getCollectionItems } from './objects/CollectionObject'
 import { processAndUpload, deleteImageIfOrphaned } from '../storage.js'
 
+// ── Smart placement ───────────────────────────────────────────────────────────
+// Find a non-overlapping canvas position near `hint`.
+function findFreePosition(existingElements, childBoards, hint, objW = 170, objH = 190) {
+  const GAP = 24
+  const allBoxes = [
+    ...existingElements.map(el => ({ x: el.x, y: el.y, w: el.w || objW, h: el.h || objH })),
+    ...childBoards.map(b => ({ x: b.x, y: b.y, w: 148, h: 130 })),
+  ]
+
+  function overlaps(px, py) {
+    return allBoxes.some(o =>
+      px < o.x + o.w + GAP && px + objW > o.x - GAP &&
+      py < o.y + o.h + GAP && py + objH > o.y - GAP
+    )
+  }
+
+  // Try hint first
+  if (!overlaps(hint.x, hint.y)) return hint
+
+  // Spiral outward in a grid pattern
+  for (let row = 0; row <= 6; row++) {
+    for (let col = -3; col <= 6; col++) {
+      const x = Math.max(20, hint.x + col * (objW + GAP))
+      const y = Math.max(20, hint.y + row * (objH + GAP))
+      if (!overlaps(x, y)) return { x, y }
+    }
+  }
+
+  return { x: hint.x, y: hint.y + (objH + GAP) * 4 }
+}
+
 export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, onHome }) {
   const [board, setBoard] = useState(null)
   const [elements, setElements] = useState([])
@@ -16,20 +47,32 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
   const [selectedId, setSelectedId] = useState(null)
   const [editingId, setEditingId] = useState(null)
   const [showImagePicker, setShowImagePicker] = useState(false)
-  const [pendingPos, setPendingPos] = useState({ x: 100, y: 100 })
+  const [pendingPos, setPendingPos] = useState({ x: 80, y: 80 })
   const [columnTarget, setColumnTarget] = useState(null)
-  const [dropOverCollectionId, setDropOverCollectionId] = useState(null)
+  const [dropOverCollectionId, _setDropOverCollectionId] = useState(null)
   const [undoStack, setUndoStack] = useState([])
   const [undoVisible, setUndoVisible] = useState(false)
-  const undoTimer = useRef(null)
+
+  // Ref mirrors for state used inside async callbacks / event handlers
   const elementsRef = useRef([])
+  const childBoardsRef = useRef([])
+  // Ref for dropOverCollectionId so onTap can read it synchronously (iOS fix)
+  const dropOverCollectionRef = useRef(null)
+
+  const undoTimer = useRef(null)
   const scaleRef = useRef(1)
   const fileRef = useRef()
   const docRef = useRef()
   const collectionFileRef = useRef()
   const importRef = useRef()
 
+  function setDropOverCollectionId(id) {
+    dropOverCollectionRef.current = id
+    _setDropOverCollectionId(id)
+  }
+
   useEffect(() => { elementsRef.current = elements }, [elements])
+  useEffect(() => { childBoardsRef.current = childBoards }, [childBoards])
   useEffect(() => { load() }, [boardId])
 
   // Desktop paste (Cmd+V)
@@ -42,7 +85,8 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
       const blob = imgItem.getAsFile()
       try {
         const meta = await processAndUpload(blob)
-        await addElement('image', pendingPos, meta)
+        const pos = findFreePosition(elementsRef.current, childBoardsRef.current, pendingPos, 160, 200)
+        await addElement('image', pos, meta)
       } catch (err) {
         console.warn('[paste] processAndUpload failed:', err)
       }
@@ -86,7 +130,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
 
   async function moveChildBoard(id, x, y) {
     setChildBoards(prev => prev.map(b => b.id === id ? { ...b, x, y } : b))
-    const b = childBoards.find(c => c.id === id)
+    const b = childBoardsRef.current.find(c => c.id === id)
     if (b) await saveBoard({ ...b, x, y })
   }
 
@@ -129,7 +173,6 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
 
   // ── Collection operations ───────────────────────────────────────────────────
 
-  // Convert any canvas object into a new Collection containing just that object
   async function makeCollection(objectEl) {
     try {
       await deleteElement(objectEl.id)
@@ -147,18 +190,16 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
     } catch (err) { console.error('makeCollection failed', err) }
   }
 
-  // Add an image (by src URL) to a collection
   async function addImageToCollection(colId, src) {
     const col = elementsRef.current.find(e => e.id === colId)
     if (!col) return
     const items = getCollectionItems(col.content)
     const newItem = { id: uid(), type: 'image', content: { src } }
-    const updated = { ...col, content: { ...col.content, items: [...items, newItem] } }
+    const updated = { ...col, content: { items: [...items, newItem] } }
     await saveElement(updated)
     setElements(prev => prev.map(e => e.id === colId ? updated : e))
   }
 
-  // Eject any item from a collection back onto the canvas
   async function ejectFromCollection(colId, itemId) {
     const col = elementsRef.current.find(e => e.id === colId)
     if (!col) return
@@ -166,24 +207,36 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
     const item = items.find(i => i.id === itemId)
     if (!item) return
     const remaining = items.filter(i => i.id !== itemId)
+
     const ejected = {
       id: uid(), boardId, type: item.type,
-      x: col.x + (col.w || 150) + 24, y: col.y,
+      x: col.x + (col.w || 150) + 32, y: col.y,
       w: item.w || 150,
       h: item.h,
       content: item.content,
       createdAt: Date.now()
     }
     await saveElement(ejected)
-    if (remaining.length === 0) {
-      await deleteElement(colId)
-      setElements(prev => prev.filter(e => e.id !== colId).concat(ejected))
-    } else {
-      const updated = { ...col, content: { items: remaining } }
-      await saveElement(updated)
-      setElements(prev => prev.map(e => e.id === colId ? updated : e).concat(ejected))
-    }
+
+    // Always keep the collection alive even when empty (so user can drag back).
+    // An empty collection shows "Drag objects here" and can be deleted explicitly.
+    const updated = { ...col, content: { items: remaining } }
+    await saveElement(updated)
+    setElements(prev => prev.map(e => e.id === colId ? updated : e).concat(ejected))
     setSelectedId(ejected.id)
+  }
+
+  // Drop a canvas element into a collection (shared logic for drag-end and tap-fallback)
+  async function dropIntoCollection(objectEl, colId) {
+    const col = elementsRef.current.find(e => e.id === colId)
+    if (!col) return
+    const items = getCollectionItems(col.content)
+    const newItem = { id: uid(), type: objectEl.type, content: objectEl.content, w: objectEl.w, h: objectEl.h }
+    const updated = { ...col, content: { items: [...items, newItem] } }
+    await saveElement(updated)
+    await deleteElement(objectEl.id)
+    setElements(prev => prev.filter(e => e.id !== objectEl.id).map(e => e.id === colId ? updated : e))
+    setSelectedId(colId)
   }
 
   // ── Drag & Drop (canvas ↔ collection) ──────────────────────────────────────
@@ -202,12 +255,10 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
   }
 
   function handleObjectDragMove(objectEl, nx, ny) {
-    // Don't allow dropping a collection into another collection
     if (normalizeType(objectEl.type) === 'collection') return
     const cx = nx + (objectEl.w || 150) / 2
     const cy = ny + 80
     const colId = hitTestCollection(cx, cy)
-    // Don't highlight if hovering over self (for collection elements)
     setDropOverCollectionId(colId !== objectEl.id ? colId : null)
   }
 
@@ -218,17 +269,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
     const cy = ny + 80
     const colId = hitTestCollection(cx, cy)
     if (!colId || colId === objectEl.id) return
-    const col = elementsRef.current.find(e => e.id === colId)
-    if (!col) return
-
-    const items = getCollectionItems(col.content)
-    const newItem = { id: uid(), type: objectEl.type, content: objectEl.content, w: objectEl.w, h: objectEl.h }
-    const updated = { ...col, content: { items: [...items, newItem] } }
-
-    await saveElement(updated)
-    await deleteElement(objectEl.id)
-    setElements(prev => prev.filter(e => e.id !== objectEl.id).map(e => e.id === colId ? updated : e))
-    setSelectedId(colId)
+    await dropIntoCollection(objectEl, colId)
   }
 
   async function removeChildBoard(id) {
@@ -238,53 +279,65 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
   }
 
   async function handleNavAction(type, pos) {
-    setPendingPos(pos || { x: 80 + Math.random() * 200, y: 80 + Math.random() * 200 })
+    const hint = pos || pendingPos
     if (type === 'image') {
+      setPendingPos(hint)
       setShowImagePicker(true)
     } else if (type === 'board') {
       const name = prompt('Board name:')
       if (!name) return
+      const bPos = findFreePosition(elementsRef.current, childBoardsRef.current, hint, 148, 130)
       const newBoard = {
         id: uid(), parentId: boardId, name: name.trim(),
         color: '#e8315a',
-        x: pendingPos.x, y: pendingPos.y, createdAt: Date.now()
+        x: bPos.x, y: bPos.y, createdAt: Date.now()
       }
       await saveBoard(newBoard)
       setChildBoards(prev => [...prev, newBoard])
     } else if (type === 'document') {
+      setPendingPos(hint)
       docRef.current.click()
     } else if (type === 'palette') {
-      await addElement('palette', pendingPos, {
+      const freePos = findFreePosition(elementsRef.current, childBoardsRef.current, hint, 200, 90)
+      await addElement('palette', freePos, {
         colors: ['#e8315a', '#f4845f', '#f7c948', '#4caf82', '#4a90d9']
       })
     } else {
-      await addElement(type, pendingPos)
+      const freePos = findFreePosition(elementsRef.current, childBoardsRef.current, hint)
+      await addElement(type, freePos)
     }
   }
 
   async function handleFiles(files) {
     const imgs = Array.from(files).filter(f => f.type.startsWith('image/'))
     const docs = Array.from(files).filter(f => f.type === 'application/pdf' || f.name.match(/\.(doc|docx)$/i))
-    for (let i = 0; i < imgs.length; i++) {
-      const col = i % 2
-      const row = Math.floor(i / 2)
-      const pos = { x: pendingPos.x + col * 162, y: pendingPos.y + row * 162 }
+
+    // Track newly-added elements so each subsequent image avoids the previous ones
+    const added = []
+    for (const img of imgs) {
+      const allExisting = [...elementsRef.current, ...added]
+      const pos = findFreePosition(allExisting, childBoardsRef.current, pendingPos, 160, 200)
       try {
-        const meta = await processAndUpload(imgs[i])
-        await addElement('image', pos, meta)
+        const meta = await processAndUpload(img)
+        const el = await addElement('image', pos, meta)
+        added.push(el)
       } catch (err) {
         console.warn('[handleFiles] processAndUpload failed:', err)
       }
     }
     for (const f of docs) {
-      const pos = { x: pendingPos.x + Math.random() * 40, y: pendingPos.y + Math.random() * 40 }
+      const pos = findFreePosition(elementsRef.current, childBoardsRef.current, pendingPos)
       await addElement('document', pos, { name: f.name, type: f.type, src: await fileToBase64(f) })
     }
   }
 
   async function pasteFromClipboard() {
     const internal = sessionStorage.getItem('refmemo_copied_image')
-    if (internal) { addElement('image', pendingPos, { src: internal }); return }
+    if (internal) {
+      const pos = findFreePosition(elementsRef.current, childBoardsRef.current, pendingPos, 160, 200)
+      addElement('image', pos, { src: internal })
+      return
+    }
     if (location.protocol === 'https:' && navigator.clipboard?.read) {
       try {
         const items = await navigator.clipboard.read()
@@ -294,7 +347,8 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
             const blob = await item.getType(imageType)
             try {
               const meta = await processAndUpload(blob)
-              await addElement('image', pendingPos, meta)
+              const pos = findFreePosition(elementsRef.current, childBoardsRef.current, pendingPos, 160, 200)
+              await addElement('image', pos, meta)
             } catch (err) {
               console.warn('[pasteFromClipboard] processAndUpload failed:', err)
             }
@@ -352,7 +406,6 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
 
       <Canvas onClick={pos => { setPendingPos(pos); setSelectedId(null); setEditingId(null) }} scaleRef={scaleRef}>
 
-        {/* Child boards */}
         {childBoards.map(b => (
           <DraggableCard key={b.id} x={b.x} y={b.y} scaleRef={scaleRef}
             alwaysDraggable
@@ -369,7 +422,6 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
           </DraggableCard>
         ))}
 
-        {/* Canvas objects */}
         {elements.map(el => (
           <DraggableCard key={el.id} x={el.x} y={el.y} scaleRef={scaleRef}
             selected={selectedId === el.id}
@@ -377,10 +429,19 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
             onDragMove={(nx, ny) => handleObjectDragMove(el, nx, ny)}
             onDragEnd={(nx, ny) => handleObjectDragEnd(el, nx, ny)}
             onTap={() => {
+              // iOS short-drag fix: if we were hovering a collection during this
+              // pointer interaction (detected via ref), complete the drop now.
+              const pendingColId = dropOverCollectionRef.current
+              if (pendingColId && normalizeType(el.type) !== 'collection') {
+                setDropOverCollectionId(null)
+                dropIntoCollection(el, pendingColId)
+                return
+              }
+
               if (selectedId === el.id) {
                 const type = normalizeType(el.type)
                 if (type === 'link' && el.content.url) window.open(el.content.url, '_blank')
-                else if (['idea', 'text', 'note', 'link', 'todo', 'palette'].includes(type)) setEditingId(el.id)
+                else if (['idea', 'text', 'note', 'link', 'todo'].includes(type)) setEditingId(el.id)
               } else {
                 setSelectedId(el.id)
                 setEditingId(null)
@@ -408,7 +469,6 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
 
       <BottomNav onAction={handleNavAction} setPendingPos={setPendingPos} />
 
-      {/* Hidden file inputs */}
       <input ref={fileRef} type="file" accept="image/*" multiple style={{ display: 'none' }}
         onChange={e => { handleFiles(Array.from(e.target.files)); e.target.value = '' }} />
       <input ref={docRef} type="file" accept=".pdf,.doc,.docx" multiple style={{ display: 'none' }}

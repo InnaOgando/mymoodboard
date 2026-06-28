@@ -15,18 +15,24 @@ export default function DocumentObject({ el, selected, onDelete }) {
   }
 
   return (
-    <div className={`el-card el-document ${selected ? 'selected' : ''}`}>
-      <div className="drag-handle">
-        <span className="handle-dots">⠿</span>
-        {selected && (
-          <button className="handle-delete" onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onDelete() }}>×</button>
+    <div style={{ position: 'relative' }}>
+      {selected && (
+        <div className="img-popup-menu" onPointerDown={e => e.stopPropagation()}>
+          <button className="img-popup-btn img-popup-delete" onPointerDown={e => e.stopPropagation()}
+            onClick={e => { e.stopPropagation(); onDelete() }}>×</button>
+        </div>
+      )}
+
+      <div className={`el-card el-document ${selected ? 'selected' : ''}`}>
+        <div className="drag-handle">
+          <span className="handle-dots">⠿</span>
+        </div>
+        <div className="doc-icon">{el.content.type === 'application/pdf' ? '📄' : '📝'}</div>
+        <div className="doc-name">{el.content.name}</div>
+        {el.content.src && (
+          <button className="doc-open" onPointerDown={e => e.stopPropagation()} onClick={openDoc}>Open</button>
         )}
       </div>
-      <div className="doc-icon">{el.content.type === 'application/pdf' ? '📄' : '📝'}</div>
-      <div className="doc-name">{el.content.name}</div>
-      {el.content.src && (
-        <button className="doc-open" onPointerDown={e => e.stopPropagation()} onClick={openDoc}>Open</button>
-      )}
     </div>
   )
 }

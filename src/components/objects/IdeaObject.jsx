@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import ResizeHandle from '../ResizeHandle'
 
-// Web Speech API hook — gracefully degrades when unavailable
 function useSpeechRecognition() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition
   const [available] = useState(!!SR)
@@ -81,45 +80,48 @@ export default function IdeaObject({ el, selected, editing, onUpdate, onDelete, 
     }
   }
 
-  // Show live interim text in the textarea while listening
   const displayText = listening
     ? (text ? text.trimEnd() + ' ' : '') + interim
     : text
 
   return (
-    <div className={`el-card el-idea ${selected ? 'selected' : ''}`} style={{ width: w, height: h }}>
-      <div className="drag-handle">
-        <span className="handle-dots">⠿</span>
-        <span className="idea-label">Idea</span>
-        {selected && (
-          <>
+    <div style={{ position: 'relative', width: w }}>
+      {selected && (
+        <div className="img-popup-menu" onPointerDown={e => e.stopPropagation()}>
+          {speechAvail && (
             <button
-              className={`idea-mic-btn ${listening ? 'listening' : ''}`}
+              className={`img-popup-btn idea-mic-btn ${listening ? 'listening' : ''}`}
               onPointerDown={e => e.stopPropagation()}
               onClick={e => { e.stopPropagation(); handleMic() }}
               title={listening ? 'Stop recording' : 'Speak to add text'}
             >
               {listening ? '⏹' : '🎙'}
             </button>
-            <button className="img-popup-btn" style={{ fontSize: '0.7rem', padding: '2px 8px', marginLeft: 'auto' }}
-              onPointerDown={e => e.stopPropagation()}
-              onClick={e => { e.stopPropagation(); onMakeCollection?.() }}>
-              + Collection
-            </button>
-            <button className="handle-delete" onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onDelete() }}>×</button>
-          </>
-        )}
+          )}
+          <button className="img-popup-btn" onPointerDown={e => e.stopPropagation()}
+            onClick={e => { e.stopPropagation(); onMakeCollection?.() }}>+ Collection</button>
+          <button className="img-popup-btn img-popup-delete" onPointerDown={e => e.stopPropagation()}
+            onClick={e => { e.stopPropagation(); onDelete() }}>×</button>
+        </div>
+      )}
+
+      <div className={`el-card el-idea ${selected ? 'selected' : ''}`} style={{ width: w, height: h }}>
+        <div className="drag-handle">
+          <span className="handle-dots">⠿</span>
+          <span className="idea-label">Idea</span>
+          {listening && <span className="listening-dot" title="Recording…" />}
+        </div>
+        <textarea
+          ref={textRef}
+          className="card-textarea card-textarea-idea"
+          style={{ height: h - 32, width: '100%', color: listening && interim ? '#888' : 'inherit' }}
+          value={displayText}
+          onChange={e => { if (!listening) onUpdate({ ...el.content, text: e.target.value }) }}
+          placeholder="Your idea…"
+        />
+        {speechMsg && <div className="speech-msg">{speechMsg}</div>}
+        {selected && <ResizeHandle w={w} h={h} onResize={onResize} minW={120} minH={60} scaleRef={scaleRef} />}
       </div>
-      <textarea
-        ref={textRef}
-        className="card-textarea card-textarea-idea"
-        style={{ height: h - 32, width: '100%', color: listening && interim ? '#888' : 'inherit' }}
-        value={displayText}
-        onChange={e => { if (!listening) onUpdate({ ...el.content, text: e.target.value }) }}
-        placeholder="Your idea…"
-      />
-      {speechMsg && <div className="speech-msg">{speechMsg}</div>}
-      {selected && <ResizeHandle w={w} h={h} onResize={onResize} minW={120} minH={60} scaleRef={scaleRef} />}
     </div>
   )
 }

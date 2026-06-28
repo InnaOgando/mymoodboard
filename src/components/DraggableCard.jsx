@@ -62,13 +62,18 @@ export default function DraggableCard({ x, y, scaleRef, onMove, onTap, onDragMov
     const s = scaleRef?.current ?? 1
     const ndx = dx / s
     const ndy = dy / s
-    if (Math.abs(ndx) > 4 || Math.abs(ndy) > 4) moved.current = true
+    const nx = startPos.current.x + ndx
+    const ny = startPos.current.y + ndy
+    lastPos.current = { x: nx, y: ny }
+
+    if (Math.abs(ndx) > 2 || Math.abs(ndy) > 2) moved.current = true
+
+    // Always report position for hover detection (drop targets, collections)
+    // even before moved.current is set — important for short drags on iOS
+    onDragMove?.(nx, ny)
+
     if (moved.current) {
-      const nx = startPos.current.x + ndx
-      const ny = startPos.current.y + ndy
-      lastPos.current = { x: nx, y: ny }
       onMove?.(nx, ny)
-      onDragMove?.(nx, ny)
     }
   }
 
