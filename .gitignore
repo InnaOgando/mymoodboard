@@ -24,3 +24,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Office / planning documents — never deploy
+*.docx
+*.doc
+*.xlsx
+*.pptx
+*.pdf
