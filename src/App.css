@@ -1459,30 +1459,22 @@ body {
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
-/* ── Floating Toolbar (Task 6) ── */
-.floating-toolbar-wrap {
-  position: fixed;
-  bottom: 68px;      /* sits above BottomNav */
-  left: 0;
-  right: 0;
-  z-index: 300;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  pointer-events: none;
-}
-.floating-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 6px 10px;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.12);
-  pointer-events: all;
+/* ── Object toolbar (contextual mode of the bottom bar) ── */
+/* Replaces creation buttons in-place when an object is selected. */
+.bottom-nav.obj-toolbar {
+  justify-content: flex-start;
   overflow-x: auto;
-  max-width: calc(100vw - 24px);
+  gap: 0;
+  padding: 0 4px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.bottom-nav.obj-toolbar::-webkit-scrollbar { display: none; }
+
+/* Panel that appears above the button row inside the bottom bar */
+.obj-panel {
+  border-bottom: 1px solid var(--border-light);
+  padding: 8px 12px;
 }
 .ft-btn {
   display: flex;
@@ -1518,19 +1510,19 @@ body {
   pointer-events: all;
   max-width: calc(100vw - 24px);
 }
-.ft-panel-colors {
+.obj-panel-colors {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
 }
-.ft-panel-swatch {
+.obj-panel-swatch {
   width: 32px;
   height: 32px;
   border-radius: 8px;
   border: none;
   cursor: pointer;
 }
-.ft-panel-swatch--none {
+.obj-panel-swatch--none {
   background: var(--canvas-bg) !important;
   color: var(--muted);
   font-size: 1rem;
@@ -1538,12 +1530,12 @@ body {
   align-items: center;
   justify-content: center;
 }
-.ft-panel-row {
+.obj-panel-row {
   display: flex;
   gap: 8px;
   align-items: center;
 }
-.ft-panel-input {
+.obj-panel-input {
   flex: 1;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -1553,8 +1545,8 @@ body {
   background: var(--surface);
   color: var(--text);
 }
-.ft-panel-input:focus { border-color: var(--accent); }
-.ft-panel-done {
+.obj-panel-input:focus { border-color: var(--accent); }
+.obj-panel-done {
   background: var(--accent);
   color: #fff;
   border: none;

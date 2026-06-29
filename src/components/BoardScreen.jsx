@@ -3,12 +3,11 @@ import { uid } from '../utils.js'
 import { getBoard, getBoards, saveBoard, deleteBoard, getElements, saveElement, deleteElement, exportAllData, importAllData } from '../db'
 import Canvas from './Canvas'
 import DraggableCard from './DraggableCard'
-import BottomNav from './BottomNav'
 import ImagePicker from './ImagePicker'
 import ObjectRenderer, { normalizeType } from './ObjectRenderer'
 import { getCollectionItems } from './objects/CollectionObject'
 import { processAndUpload, deleteImageIfOrphaned } from '../storage.js'
-import FloatingToolbar from './FloatingToolbar'
+import BoardToolbar from './BoardToolbar'
 import ImagePreview from './ImagePreview'
 import CollectionGallery from './CollectionGallery'
 
@@ -351,6 +350,19 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
     saveElement(updated).catch(e => console.error('[todoTitle]', e))
   }
 
+  function renameCollection(id) {
+    const col = elementsRef.current.find(e => e.id === id)
+    if (!col) return
+    const next = prompt('Collection name:', col.content.name || 'Collection')
+    if (next !== null) updateContent(id, { ...col.content, name: next.trim() || 'Collection' })
+  }
+
+  function setCollectionColor(id, color) {
+    const col = elementsRef.current.find(e => e.id === id)
+    if (!col) return
+    updateContent(id, { ...col.content, color: color ?? undefined })
+  }
+
   // Drop a canvas element into a collection (shared logic for drag-end and tap-fallback)
   async function dropIntoCollection(objectEl, colId) {
     const col = elementsRef.current.find(e => e.id === colId)
@@ -610,7 +622,31 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
         ))}
       </Canvas>
 
-      <BottomNav onAction={handleNavAction} />
+      {/* Single toolbar — swaps between creation and contextual mode based on selection */}
+      {(() => {
+        const selEl  = selectedId ? elementsRef.current.find(e => e.id === selectedId) : null
+        const selType = selEl ? normalizeType(selEl.type) : null
+        return (
+          <BoardToolbar
+            key={selectedId || 'create'}
+            selectedEl={selEl}
+            selectedType={selType}
+            onAction={handleNavAction}
+            onDelete={() => removeElement(selectedId)}
+            onLock={() => toggleLock(selectedId)}
+            onGroup={() => { if (selEl) makeCollection(selEl) }}
+            onCopy={() => { if (selEl) copyElement(selEl) }}
+            onCut={() => { if (selEl) cutElement(selEl) }}
+            onDuplicate={() => { if (selEl) duplicateElement(selEl) }}
+            onCaption={caption => setElementCaption(selectedId, caption)}
+            onBgColor={color => setElementBgColor(selectedId, color)}
+            onAddTitle={title => setTodoTitle(selectedId, title)}
+            onEdit={() => setEditingId(selectedId)}
+            onRename={() => renameCollection(selectedId)}
+            onColor={color => setCollectionColor(selectedId, color)}
+          />
+        )
+      })()}
 
       <input ref={fileRef} type="file" accept="image/*" multiple style={{ display: 'none' }}
         onChange={e => { handleFiles(Array.from(e.target.files)); e.target.value = '' }} />
@@ -632,30 +668,6 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
           <button className="undo-close" onPointerDown={e => e.stopPropagation()} onClick={() => setUndoVisible(false)}>×</button>
         </div>
       )}
-
-      {/* Contextual bottom toolbar — shown when any non-collection object is selected */}
-      {selectedId && (() => {
-        const selEl = elementsRef.current.find(e => e.id === selectedId)
-        if (!selEl) return null
-        const selType = normalizeType(selEl.type)
-        if (selType === 'collection') return null
-        return (
-          <FloatingToolbar
-            key={selectedId}
-            el={selEl}
-            type={selType}
-            onDelete={() => removeElement(selectedId)}
-            onLock={() => toggleLock(selectedId)}
-            onGroup={() => { const el = elementsRef.current.find(e => e.id === selectedId); if (el) makeCollection(el) }}
-            onCopy={() => { const el = elementsRef.current.find(e => e.id === selectedId); if (el) copyElement(el) }}
-            onCut={() => { const el = elementsRef.current.find(e => e.id === selectedId); if (el) cutElement(el) }}
-            onDuplicate={() => { const el = elementsRef.current.find(e => e.id === selectedId); if (el) duplicateElement(el) }}
-            onCaption={caption => setElementCaption(selectedId, caption)}
-            onBgColor={color => setElementBgColor(selectedId, color)}
-            onAddTitle={title => setTodoTitle(selectedId, title)}
-          />
-        )
-      })()}
 
       {/* Image Preview modal */}
       {previewEl && (
