@@ -1,8 +1,6 @@
-import { useState, useEffect } from 'react'
 import ResizeHandle from '../ResizeHandle'
 import CachedImage from './CachedImage'
 import { getPaletteColors } from './PaletteObject'
-import { PRESET_COLORS } from '../../colors'
 
 function normalizeType(type) {
   if (type === 'text' || type === 'note') return 'idea'
@@ -35,7 +33,6 @@ function CollectionItem({ item }) {
         <CachedImage
           src={item.content.src}
           hash={item.content.hash}
-          // Images display at their stored width — never resize inside a collection
           style={{ width: item.w || 150, height: 'auto', display: 'block' }}
           draggable={false}
         />
@@ -84,58 +81,15 @@ function CollectionItem({ item }) {
 }
 
 export default function CollectionObject({
-  el, selected, isDropTarget, onUpdate, onDelete, onResize, onEjectItem, onDuplicate, scaleRef
+  el, selected, isDropTarget, onResize, onEjectItem, scaleRef,
 }) {
   const w = el.w || 260
   const items = getCollectionItems(el.content)
   const accentColor = el.content.color || null
   const label = el.content.name || 'Collection'
 
-  const [showMenu, setShowMenu] = useState(false)
-  const [showColors, setShowColors] = useState(false)
-
-  useEffect(() => {
-    if (!selected) { setShowMenu(false); setShowColors(false) }
-  }, [selected])
-
-  function handleRename() {
-    const next = prompt('Collection name:', label)
-    if (next !== null) onUpdate({ ...el.content, name: next.trim() || 'Collection' })
-    setShowMenu(false)
-  }
-
-  function handleColorSelect(color) {
-    onUpdate({ ...el.content, color })
-    setShowColors(false)
-    setShowMenu(false)
-  }
-
   return (
     <div style={{ position: 'relative', width: w, paddingBottom: selected ? 12 : 0 }}>
-
-      {selected && showMenu && (
-        <div className="col-menu-dropdown" onPointerDown={e => e.stopPropagation()}>
-          <button className="col-menu-item" onClick={e => { e.stopPropagation(); handleRename() }}>Rename</button>
-          <button className="col-menu-item" onClick={e => { e.stopPropagation(); setShowMenu(false); setShowColors(true) }}>Color</button>
-          <button className="col-menu-item" onClick={e => { e.stopPropagation(); onDuplicate?.(); setShowMenu(false) }}>Duplicate</button>
-          <button className="col-menu-item col-menu-danger" onClick={e => { e.stopPropagation(); onDelete(); setShowMenu(false) }}>Delete</button>
-        </div>
-      )}
-
-      {selected && showColors && (
-        <div className="col-color-panel" onPointerDown={e => e.stopPropagation()}>
-          {PRESET_COLORS.map(c => (
-            <button
-              key={c}
-              className={`col-color-swatch ${accentColor === c ? 'col-color-swatch--active' : ''}`}
-              style={{ background: c }}
-              onClick={e => { e.stopPropagation(); handleColorSelect(c) }}
-            />
-          ))}
-          <button className="col-color-none"
-            onClick={e => { e.stopPropagation(); handleColorSelect(null) }}>None</button>
-        </div>
-      )}
 
       <div
         className={`el-card el-collection ${selected ? 'selected' : ''} ${isDropTarget ? 'drop-target' : ''}`}
@@ -144,13 +98,6 @@ export default function CollectionObject({
         <div className="drag-handle" style={{ background: accentColor ? `${accentColor}1a` : undefined }}>
           <span className="handle-dots">⠿</span>
           <span className="column-label">{label}</span>
-          {selected && (
-            <button
-              className="col-menu-btn"
-              onPointerDown={e => e.stopPropagation()}
-              onClick={e => { e.stopPropagation(); setShowColors(false); setShowMenu(m => !m) }}
-            >⋯</button>
-          )}
         </div>
 
         {items.length === 0 ? (
@@ -160,22 +107,21 @@ export default function CollectionObject({
             {items.map(item => {
               const isText = normalizeType(item.type) !== 'image'
               return (
-              <div key={item.id} className={`collection-item-wrap${isText ? ' collection-item-wrap--text' : ''}`}>
-                <CollectionItem item={item} />
-                {selected && (
-                  <button
-                    className="col-img-eject"
-                    onPointerDown={e => e.stopPropagation()}
-                    onClick={e => { e.stopPropagation(); onEjectItem?.(item.id) }}
-                    title="Move to canvas"
-                  >↗</button>
-                )}
-              </div>
+                <div key={item.id} className={`collection-item-wrap${isText ? ' collection-item-wrap--text' : ''}`}>
+                  <CollectionItem item={item} />
+                  {selected && (
+                    <button
+                      className="col-img-eject"
+                      onPointerDown={e => e.stopPropagation()}
+                      onClick={e => { e.stopPropagation(); onEjectItem?.(item.id) }}
+                      title="Move to canvas"
+                    >↗</button>
+                  )}
+                </div>
               )
             })}
           </div>
         )}
-
       </div>
 
       {selected && (
