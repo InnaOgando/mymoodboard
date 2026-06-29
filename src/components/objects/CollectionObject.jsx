@@ -36,7 +36,7 @@ function CollectionItem({ item }) {
           src={item.content.src}
           hash={item.content.hash}
           // Images display at their stored width — never resize inside a collection
-          style={{ width: item.w || 150, height: 'auto', display: 'block', maxWidth: '100%' }}
+          style={{ width: item.w || 150, height: 'auto', display: 'block' }}
           draggable={false}
         />
       )
@@ -177,7 +177,9 @@ export default function CollectionObject({
         )}
 
         {selected && (
-          <ResizeHandle w={w} h={null} onResize={nw => onResize(nw, null)} minW={140} scaleRef={scaleRef} />
+          <ResizeHandle w={w} h={null} onResize={nw => onResize(nw, null)}
+            minW={Math.max(140, ...items.map(i => i.w || 150))}
+            scaleRef={scaleRef} />
         )}
       </div>
     </div>
