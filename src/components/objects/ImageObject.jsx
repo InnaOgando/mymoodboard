@@ -1,34 +1,32 @@
 import ResizeHandle from '../ResizeHandle'
 import { useCachedImage } from '../../ImageImportService.js'
 
-export default function ImageObject({ el, selected, onDelete, onResize, onMakeCollection, scaleRef }) {
+export default function ImageObject({ el, selected, onResize, scaleRef }) {
   const w = el.w || 150
-  // Always prefer local Blob cache; falls back to remote src if not cached locally
   const { ref, loaded, visibleSrc, placeholderSrc } = useCachedImage(el.content.src, el.content.hash)
 
   return (
     <div style={{ position: 'relative', width: w }}>
-      {selected && (
-        <div className="img-popup-menu" onPointerDown={e => e.stopPropagation()}>
-          <button className="img-popup-btn" onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onMakeCollection?.() }}>+ Collection</button>
-          <button className="img-popup-btn img-popup-delete" onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onDelete() }}>×</button>
-        </div>
-      )}
-      <div ref={ref} className={`el-card el-image ${selected ? 'selected' : ''}`} style={{ width: w, position: 'relative', minHeight: 60 }}>
+      <div ref={ref} className={`el-card el-image ${selected ? 'selected' : ''}`}
+        style={{ width: w, position: 'relative', minHeight: 60 }}>
         {!loaded && (
           <div style={{ width: '100%', minHeight: 80, background: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div style={{ width: 20, height: 20, border: '2px solid #ccc', borderTopColor: '#888', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
           </div>
         )}
         {visibleSrc && (
-          <img src={visibleSrc} alt="" draggable={false}
+          <img src={visibleSrc} alt={el.content.caption || ''} draggable={false}
             style={{ width: '100%', height: 'auto', display: 'block', opacity: loaded ? 1 : 0, transition: 'opacity 0.3s ease' }} />
         )}
         {!visibleSrc && !loaded && (
-          <img src={placeholderSrc} alt="" draggable={false} style={{ width: '100%', height: 'auto', display: 'block' }} />
+          <img src={placeholderSrc} alt="" draggable={false}
+            style={{ width: '100%', height: 'auto', display: 'block' }} />
         )}
         {selected && <ResizeHandle w={w} h={null} onResize={nw => onResize(nw, null)} minW={60} scaleRef={scaleRef} />}
       </div>
+      {el.content.caption && (
+        <div className="image-caption">{el.content.caption}</div>
+      )}
     </div>
   )
 }

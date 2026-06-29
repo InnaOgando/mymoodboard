@@ -8,7 +8,7 @@ export default function ResizeHandle({ w, h, onResize, minW = 80, minH = 60, sca
     <div
       ref={divRef}
       className="resize-handle"
-      style={{ touchAction: 'none' }}
+      style={{ touchAction: 'none', padding: 16, margin: -16, boxSizing: 'content-box' }}
       onPointerDown={e => {
         e.stopPropagation()
         e.preventDefault()

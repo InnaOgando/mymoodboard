@@ -33,18 +33,18 @@ const MAX_COLORS = 12
 const SWATCH_SIZE = 44   // px — square swatch cell (meets 44px touch target)
 const SWATCH_GAP  = 6
 
-export default function PaletteObject({ el, selected, onUpdate, onDelete, onMakeCollection, onResize, scaleRef }) {
+export default function PaletteObject({ el, selected, editing, onUpdate, onResize, scaleRef }) {
   const colors = getPaletteColors(el.content)
   const w = el.w || 210  // defaults to 3 swatches wide: 3×44 + 2×6 + 20pad ≈ 210
 
-  const [editMode, setEditMode] = useState(false)
   const [editingIdx, setEditingIdx] = useState(null)
   const lastTapRef = useRef({ index: -1, time: 0 })
+  const editMode = !!editing  // two-tap (editing prop) activates edit mode
 
-  // Exit edit mode when the card is deselected
+  // Reset when leaving edit mode
   useEffect(() => {
-    if (!selected) { setEditMode(false); setEditingIdx(null) }
-  }, [selected])
+    if (!editing) setEditingIdx(null)
+  }, [editing])
 
   function setColors(next) {
     onUpdate({ ...el.content, colors: next })
@@ -87,33 +87,17 @@ export default function PaletteObject({ el, selected, onUpdate, onDelete, onMake
 
   return (
     <div style={{ position: 'relative', width: w }}>
-      {/* Floating popup — different buttons in normal vs edit mode */}
-      {selected && !editMode && (
-        <div className="img-popup-menu" onPointerDown={e => e.stopPropagation()}>
-          <button className="img-popup-btn" onPointerDown={e => e.stopPropagation()}
-            onClick={e => { e.stopPropagation(); setEditMode(true) }}>✎ Edit</button>
-          <button className="img-popup-btn" onPointerDown={e => e.stopPropagation()}
-            onClick={e => { e.stopPropagation(); onMakeCollection?.() }}>+ Collection</button>
-          <button className="img-popup-btn img-popup-delete" onPointerDown={e => e.stopPropagation()}
-            onClick={e => { e.stopPropagation(); onDelete() }}>×</button>
-        </div>
-      )}
-      {selected && editMode && (
-        <div className="img-popup-menu" onPointerDown={e => e.stopPropagation()}>
-          <button className="img-popup-btn" onPointerDown={e => e.stopPropagation()}
-            onClick={e => { e.stopPropagation(); setEditMode(false); setEditingIdx(null) }}>✓ Done</button>
-          {colors.length < MAX_COLORS && (
-            <button className="img-popup-btn" onPointerDown={e => e.stopPropagation()}
-              onClick={e => { e.stopPropagation(); addColor() }}>+ Color</button>
-          )}
-        </div>
-      )}
 
       <div className={`el-card el-palette ${selected ? 'selected' : ''} ${editMode ? 'palette-edit-mode' : ''}`}
         style={{ width: w }}>
         <div className="drag-handle">
           <span className="handle-dots">⠿</span>
-          <span className="palette-label">{editMode ? 'Palette · double-tap to edit' : 'Palette'}</span>
+          <span className="palette-label">{editMode ? 'Palette · tap swatch to edit' : 'Palette'}</span>
+          {editMode && colors.length < MAX_COLORS && (
+            <button className="palette-add-btn"
+              onPointerDown={e => e.stopPropagation()}
+              onClick={e => { e.stopPropagation(); addColor() }}>+ Color</button>
+          )}
         </div>
 
         {/* Swatch grid */}

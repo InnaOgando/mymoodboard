@@ -8,6 +8,9 @@ import ImagePicker from './ImagePicker'
 import ObjectRenderer, { normalizeType } from './ObjectRenderer'
 import { getCollectionItems } from './objects/CollectionObject'
 import { processAndUpload, deleteImageIfOrphaned } from '../storage.js'
+import FloatingToolbar from './FloatingToolbar'
+import ImagePreview from './ImagePreview'
+import CollectionGallery from './CollectionGallery'
 
 // ── Viewport-aware placement ──────────────────────────────────────────────────
 // Computes the current visible canvas area so new objects always land in view.
@@ -74,6 +77,8 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
   const [dropOverCollectionId, _setDropOverCollectionId] = useState(null)
   const [undoStack, setUndoStack] = useState([])
   const [undoVisible, setUndoVisible] = useState(false)
+  const [previewEl, setPreviewEl] = useState(null)       // image preview modal
+  const [galleryEl, setGalleryEl] = useState(null)       // collection gallery modal
 
   // Ref mirrors for state used inside async callbacks / event handlers
   const elementsRef = useRef([])
@@ -147,7 +152,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
     // (the useEffect that mirrors state→ref only runs after the next render)
     elementsRef.current = [...elementsRef.current, el]
     setElements(prev => [...prev, el])
-    const editableTypes = ['idea', 'text', 'note', 'link', 'todo']
+    const editableTypes = ['idea', 'text', 'note', 'link', 'todo', 'palette']
     if (editableTypes.includes(type)) setEditingId(el.id)
     saveElement(el, { skipRemote }).catch(e => console.error('[addElement] saveElement failed:', e))
     return el
@@ -271,6 +276,81 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
     saveElement(newCol).catch(e => console.error('[duplicateCollection] saveElement failed:', e))
   }
 
+  // ── Lock / Copy / Cut / Paste / Duplicate ──────────────────────────────────
+
+  function toggleLock(id) {
+    const el = elementsRef.current.find(e => e.id === id)
+    if (!el) return
+    const updated = { ...el, locked: !el.locked }
+    setElements(prev => prev.map(e => e.id === id ? updated : e))
+    saveElement(updated).catch(e => console.error('[toggleLock]', e))
+  }
+
+  async function duplicateElement(el) {
+    const vp = getViewport()
+    const pos = findFreePosition(elementsRef.current, childBoardsRef.current, vp, el.w || 150, el.h || 150)
+    const dup = { ...el, id: uid(), x: pos.x, y: pos.y, createdAt: Date.now() }
+    if (dup.type === 'collection') {
+      dup.content = { ...dup.content, items: (dup.content.items || []).map(item => ({ ...item, id: uid() })) }
+    }
+    elementsRef.current = [...elementsRef.current, dup]
+    setElements(prev => [...prev, dup])
+    setSelectedId(dup.id)
+    saveElement(dup).catch(e => console.error('[duplicate]', e))
+  }
+
+  function copyElement(el) {
+    const { id: _id, boardId: _bid, ...rest } = el
+    sessionStorage.setItem('refmemo_clipboard', JSON.stringify(rest))
+  }
+
+  function cutElement(el) {
+    copyElement(el)
+    removeElement(el.id)
+    setSelectedId(null)
+  }
+
+  async function pasteElement() {
+    const json = sessionStorage.getItem('refmemo_clipboard')
+    if (!json) return
+    try {
+      const template = JSON.parse(json)
+      const vp = getViewport()
+      const w = template.w || 150
+      const h = template.h || 150
+      const pos = findFreePosition(elementsRef.current, childBoardsRef.current, vp, w, h)
+      const el = { ...template, id: uid(), boardId, x: pos.x, y: pos.y, createdAt: Date.now() }
+      elementsRef.current = [...elementsRef.current, el]
+      setElements(prev => [...prev, el])
+      setSelectedId(el.id)
+      saveElement(el).catch(e => console.error('[paste]', e))
+    } catch (e) { console.error('[paste] failed', e) }
+  }
+
+  function setElementCaption(id, caption) {
+    const el = elementsRef.current.find(e => e.id === id)
+    if (!el) return
+    const updated = { ...el, content: { ...el.content, caption } }
+    setElements(prev => prev.map(e => e.id === id ? updated : e))
+    saveElement(updated).catch(e => console.error('[caption]', e))
+  }
+
+  function setElementBgColor(id, bgColor) {
+    const el = elementsRef.current.find(e => e.id === id)
+    if (!el) return
+    const updated = { ...el, content: { ...el.content, bgColor } }
+    setElements(prev => prev.map(e => e.id === id ? updated : e))
+    saveElement(updated).catch(e => console.error('[bgColor]', e))
+  }
+
+  function setTodoTitle(id, title) {
+    const el = elementsRef.current.find(e => e.id === id)
+    if (!el) return
+    const updated = { ...el, content: { ...el.content, title } }
+    setElements(prev => prev.map(e => e.id === id ? updated : e))
+    saveElement(updated).catch(e => console.error('[todoTitle]', e))
+  }
+
   // Drop a canvas element into a collection (shared logic for drag-end and tap-fallback)
   async function dropIntoCollection(objectEl, colId) {
     const col = elementsRef.current.find(e => e.id === colId)
@@ -368,15 +448,13 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
     const docs = Array.from(files).filter(f => f.type === 'application/pdf' || f.name.match(/\.(doc|docx)$/i))
     const vp = getViewport()
 
-    // Track newly-added elements so each subsequent image avoids the previous ones
-    const added = []
+    // addElement updates elementsRef.current synchronously, so each iteration
+    // sees the previously placed image and avoids overlap automatically.
     for (const img of imgs) {
-      const allExisting = [...elementsRef.current, ...added]
-      const pos = findFreePosition(allExisting, childBoardsRef.current, vp, 160, 200)
+      const pos = findFreePosition(elementsRef.current, childBoardsRef.current, vp, 160, 200)
       try {
         const meta = await processAndUpload(img)
-        const el = await addElement('image', pos, meta)
-        added.push(el)
+        await addElement('image', pos, meta)
       } catch (err) {
         console.warn('[handleFiles] processAndUpload failed:', err)
       }
@@ -487,6 +565,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
         {elements.map(el => (
           <DraggableCard key={el.id} x={el.x} y={el.y} scaleRef={scaleRef}
             selected={selectedId === el.id}
+            locked={!!el.locked}
             onMove={(x, y) => moveElement(el.id, x, y)}
             onDragMove={(nx, ny) => handleObjectDragMove(el, nx, ny)}
             onDragEnd={(nx, ny) => handleObjectDragEnd(el, nx, ny)}
@@ -500,10 +579,18 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
                 return
               }
 
-              if (selectedId === el.id) {
+              if (selectedId === el.id && !el.locked) {
+                // Second tap behaviour varies by type
                 const type = normalizeType(el.type)
-                if (type === 'link' && el.content.url) window.open(el.content.url, '_blank')
-                else if (['idea', 'text', 'note', 'link', 'todo'].includes(type)) setEditingId(el.id)
+                if (type === 'image') {
+                  setPreviewEl(el)
+                } else if (type === 'collection') {
+                  setGalleryEl(el)
+                } else if (type === 'palette') {
+                  setEditingId(el.id)
+                } else if (['idea', 'text', 'note', 'link', 'todo'].includes(type)) {
+                  setEditingId(el.id)
+                }
               } else {
                 setSelectedId(el.id)
                 setEditingId(null)
@@ -550,6 +637,40 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
           <button className="undo-btn" onClick={undo}>Desfazer</button>
           <button className="undo-close" onPointerDown={e => e.stopPropagation()} onClick={() => setUndoVisible(false)}>×</button>
         </div>
+      )}
+
+      {/* Contextual bottom toolbar — shown when any non-collection object is selected */}
+      {selectedId && (() => {
+        const selEl = elementsRef.current.find(e => e.id === selectedId)
+        if (!selEl) return null
+        const selType = normalizeType(selEl.type)
+        if (selType === 'collection') return null
+        return (
+          <FloatingToolbar
+            key={selectedId}
+            el={selEl}
+            type={selType}
+            onDelete={() => removeElement(selectedId)}
+            onLock={() => toggleLock(selectedId)}
+            onGroup={() => { const el = elementsRef.current.find(e => e.id === selectedId); if (el) makeCollection(el) }}
+            onCopy={() => { const el = elementsRef.current.find(e => e.id === selectedId); if (el) copyElement(el) }}
+            onCut={() => { const el = elementsRef.current.find(e => e.id === selectedId); if (el) cutElement(el) }}
+            onDuplicate={() => { const el = elementsRef.current.find(e => e.id === selectedId); if (el) duplicateElement(el) }}
+            onCaption={caption => setElementCaption(selectedId, caption)}
+            onBgColor={color => setElementBgColor(selectedId, color)}
+            onAddTitle={title => setTodoTitle(selectedId, title)}
+          />
+        )
+      })()}
+
+      {/* Image Preview modal */}
+      {previewEl && (
+        <ImagePreview el={previewEl} onClose={() => setPreviewEl(null)} />
+      )}
+
+      {/* Collection Gallery modal */}
+      {galleryEl && (
+        <CollectionGallery el={galleryEl} onClose={() => setGalleryEl(null)} />
       )}
     </div>
   )

@@ -2,7 +2,10 @@ import { useRef } from 'react'
 
 const INTERACTIVE = new Set(['INPUT', 'TEXTAREA', 'SELECT', 'A'])
 
-export default function DraggableCard({ x, y, scaleRef, onMove, onTap, onDragMove, onDragEnd, children, selected, alwaysDraggable }) {
+export default function DraggableCard({
+  x, y, scaleRef, onMove, onTap, onDragMove, onDragEnd,
+  children, selected, alwaysDraggable, locked,
+}) {
   const isDragging = useRef(false)
   const startPointer = useRef({ x: 0, y: 0 })
   const startPos = useRef({ x: 0, y: 0 })
@@ -18,6 +21,7 @@ export default function DraggableCard({ x, y, scaleRef, onMove, onTap, onDragMov
       longTimer.current = null
     }
     ref.current?.classList.remove('long-pressing')
+    ref.current?.classList.remove('lifted')
   }
 
   function onPointerDown(e) {
@@ -31,12 +35,16 @@ export default function DraggableCard({ x, y, scaleRef, onMove, onTap, onDragMov
     startPointer.current = { x: e.clientX, y: e.clientY }
     savedPointerId.current = e.pointerId
 
-    if (selected || alwaysDraggable) {
+    // Locked objects: tap only, no drag
+    if (locked) return
+
+    if (alwaysDraggable) {
+      // Home-screen boards: direct drag, no long-press delay
       isDragging.current = true
       startPos.current = { x, y }
-      ref.current.setPointerCapture(e.pointerId)
+      ref.current?.setPointerCapture(e.pointerId)
     } else {
-      // Long-press activates drag on unselected elements
+      // Canvas objects: always require long press before moving (spec §3)
       ref.current?.classList.add('long-pressing')
       const capturedX = x
       const capturedY = y
@@ -44,17 +52,18 @@ export default function DraggableCard({ x, y, scaleRef, onMove, onTap, onDragMov
       longTimer.current = setTimeout(() => {
         longTimer.current = null
         ref.current?.classList.remove('long-pressing')
+        ref.current?.classList.add('lifted')
         isDragging.current = true
         startPos.current = { x: capturedX, y: capturedY }
         try { ref.current?.setPointerCapture(capturedId) } catch {}
-      }, 450)
+      }, 400)
     }
   }
 
   function onPointerMove(e) {
     const dx = e.clientX - startPointer.current.x
     const dy = e.clientY - startPointer.current.y
-    // Cancel long-press if finger moves too much (user is scrolling canvas)
+    // Cancel long-press if finger moves significantly (user is scrolling canvas)
     if (longTimer.current && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
       cancelLong()
     }
@@ -68,17 +77,13 @@ export default function DraggableCard({ x, y, scaleRef, onMove, onTap, onDragMov
 
     if (Math.abs(ndx) > 2 || Math.abs(ndy) > 2) moved.current = true
 
-    // Always report position for hover detection (drop targets, collections)
-    // even before moved.current is set — important for short drags on iOS
     onDragMove?.(nx, ny)
-
-    if (moved.current) {
-      onMove?.(nx, ny)
-    }
+    if (moved.current) onMove?.(nx, ny)
   }
 
   function onPointerUp() {
     cancelLong()
+    ref.current?.classList.remove('lifted')
     if (moved.current) {
       onDragEnd?.(lastPos.current.x, lastPos.current.y)
     } else {

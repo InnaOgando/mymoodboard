@@ -12,6 +12,32 @@ function randomColor() {
 
 const BOARD_W = 148
 const BOARD_H = 130
+const VP_KEY = 'refmemo_home_vp'
+
+function saveViewport(offsetRef, scaleRef) {
+  sessionStorage.setItem(VP_KEY, JSON.stringify({
+    x: offsetRef.current.x,
+    y: offsetRef.current.y,
+    scale: scaleRef.current,
+  }))
+}
+
+// Set canvas offset so existing boards are centered in the viewport.
+function centerOnBoards(boards, containerRef, offsetRef, scaleRef) {
+  if (!boards.length || !containerRef.current) return
+  const rect = containerRef.current.getBoundingClientRect()
+  const scale = scaleRef.current || 1
+  const xs = boards.map(b => b.x)
+  const ys = boards.map(b => b.y)
+  const minX = Math.min(...xs)
+  const maxX = Math.max(...boards.map(b => b.x + BOARD_W))
+  const minY = Math.min(...ys)
+  const maxY = Math.max(...boards.map(b => b.y + BOARD_H))
+  offsetRef.current = {
+    x: rect.width  / 2 - ((minX + maxX) / 2) * scale,
+    y: rect.height / 2 - ((minY + maxY) / 2) * scale,
+  }
+}
 
 // Place new board to the right of the rightmost board; wrap to a new row if needed.
 // viewportW is the usable canvas width in canvas coordinates.
@@ -61,8 +87,30 @@ export default function HomeScreen({ onOpenBoard, session }) {
   useEffect(() => { load() }, [])
 
   async function load() {
-    const list = await getBoards(null, { onSync: setBoards })
+    // Restore saved viewport BEFORE setBoards so Canvas applies it on first render
+    const saved = sessionStorage.getItem(VP_KEY)
+    if (saved) {
+      try {
+        const { x, y, scale } = JSON.parse(saved)
+        canvasOffsetRef.current = { x, y }
+        scaleRef.current = scale
+      } catch {}
+    }
+
+    const list = await getBoards(null, {
+      onSync: boards => {
+        if (!saved && boards.length) centerOnBoards(boards, canvasContainerRef, canvasOffsetRef, scaleRef)
+        setBoards(boards)
+      }
+    })
+
+    if (!saved && list.length) centerOnBoards(list, canvasContainerRef, canvasOffsetRef, scaleRef)
     setBoards(list)
+  }
+
+  function handleOpenBoard(id) {
+    saveViewport(canvasOffsetRef, scaleRef)
+    onOpenBoard(id)
   }
 
   function getViewportW() {
@@ -145,7 +193,7 @@ export default function HomeScreen({ onOpenBoard, session }) {
             selected={selectedId === board.id}
             onMove={(x, y) => moveBoard(board.id, x, y)}
             onTap={() => {
-              if (selectedId === board.id) onOpenBoard(board.id)
+              if (selectedId === board.id) handleOpenBoard(board.id)
               else setSelectedId(board.id)
             }}
           >

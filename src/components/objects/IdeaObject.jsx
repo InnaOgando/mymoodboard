@@ -21,22 +21,15 @@ function useSpeechRecognition() {
       let interimText = ''
       let finalText = ''
       for (const result of Array.from(e.results)) {
-        if (result.isFinal) {
-          finalText += result[0].transcript
-        } else {
-          interimText += result[0].transcript
-        }
+        if (result.isFinal) finalText += result[0].transcript
+        else interimText += result[0].transcript
       }
       if (finalText) finalAccumRef.current = finalText
       setInterim(interimText)
       onChange(finalAccumRef.current, interimText)
     }
     rec.onend = () => { setListening(false); setInterim('') }
-    rec.onerror = (e) => {
-      console.warn('[speech]', e.error)
-      setListening(false)
-      setInterim('')
-    }
+    rec.onerror = (e) => { console.warn('[speech]', e.error); setListening(false); setInterim('') }
     rec.start()
     recRef.current = rec
     setListening(true)
@@ -51,12 +44,13 @@ function useSpeechRecognition() {
   return { available, listening, interim, start, stop }
 }
 
-export default function IdeaObject({ el, selected, editing, onUpdate, onDelete, onResize, onMakeCollection, scaleRef }) {
+export default function IdeaObject({ el, selected, editing, onUpdate, onResize, scaleRef }) {
   const textRef = useRef()
   const baseTextRef = useRef('')
   const w = el.w || 220
   const h = el.h || 120
   const text = el.content.text || ''
+  const bgColor = el.content.bgColor || null
   const [speechMsg, setSpeechMsg] = useState('')
   const { available: speechAvail, listening, interim, start, stop } = useSpeechRecognition()
 
@@ -68,11 +62,11 @@ export default function IdeaObject({ el, selected, editing, onUpdate, onDelete, 
     if (listening) {
       stop()
     } else if (!speechAvail) {
-      setSpeechMsg('Speech recognition not available in this browser.')
+      setSpeechMsg('Speech recognition not available.')
       setTimeout(() => setSpeechMsg(''), 3000)
     } else {
       baseTextRef.current = text
-      start((final, _interim) => {
+      start((final) => {
         const base = baseTextRef.current
         const combined = base ? base.trimEnd() + ' ' + final.trim() : final.trim()
         onUpdate({ ...el.content, text: combined })
@@ -80,41 +74,29 @@ export default function IdeaObject({ el, selected, editing, onUpdate, onDelete, 
     }
   }
 
-  const displayText = listening
-    ? (text ? text.trimEnd() + ' ' : '') + interim
-    : text
+  const displayText = listening ? (text ? text.trimEnd() + ' ' : '') + interim : text
 
   return (
     <div style={{ position: 'relative', width: w }}>
-      {selected && (
-        <div className="img-popup-menu" onPointerDown={e => e.stopPropagation()}>
-          {speechAvail && (
-            <button
-              className={`img-popup-btn idea-mic-btn ${listening ? 'listening' : ''}`}
-              onPointerDown={e => e.stopPropagation()}
-              onClick={e => { e.stopPropagation(); handleMic() }}
-              title={listening ? 'Stop recording' : 'Speak to add text'}
-            >
-              {listening ? '⏹' : '🎙'}
-            </button>
-          )}
-          <button className="img-popup-btn" onPointerDown={e => e.stopPropagation()}
-            onClick={e => { e.stopPropagation(); onMakeCollection?.() }}>+ Collection</button>
-          <button className="img-popup-btn img-popup-delete" onPointerDown={e => e.stopPropagation()}
-            onClick={e => { e.stopPropagation(); onDelete() }}>×</button>
-        </div>
-      )}
-
-      <div className={`el-card el-idea ${selected ? 'selected' : ''}`} style={{ width: w, height: h }}>
+      <div className={`el-card el-idea ${selected ? 'selected' : ''}`}
+        style={{ width: w, height: h, background: bgColor || undefined }}>
         <div className="drag-handle">
           <span className="handle-dots">⠿</span>
           <span className="idea-label">Idea</span>
+          {speechAvail && (
+            <button
+              className={`idea-mic-btn ${listening ? 'listening' : ''}`}
+              onPointerDown={e => e.stopPropagation()}
+              onClick={e => { e.stopPropagation(); handleMic() }}
+              title={listening ? 'Stop recording' : 'Speak'}
+            >{listening ? '⏹' : '🎙'}</button>
+          )}
           {listening && <span className="listening-dot" title="Recording…" />}
         </div>
         <textarea
           ref={textRef}
           className="card-textarea card-textarea-idea"
-          style={{ height: h - 32, width: '100%', color: listening && interim ? '#888' : 'inherit' }}
+          style={{ height: h - 32, width: '100%', color: listening && interim ? '#888' : 'inherit', background: 'transparent' }}
           value={displayText}
           onChange={e => { if (!listening) onUpdate({ ...el.content, text: e.target.value }) }}
           placeholder="Your idea…"

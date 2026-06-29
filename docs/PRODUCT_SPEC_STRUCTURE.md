@@ -14,7 +14,7 @@
 # PRODUCT_SPEC.md
 
 Version: 1.1
-
+ 
 Status: Active
 
 This document is the single source of truth for RefMemo user behavior.

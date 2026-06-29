@@ -1439,3 +1439,246 @@ body {
   font-size: 0.65rem;
   text-align: right;
 }
+
+/* ── Drag lift animation (Task 4) ── */
+.long-pressing {
+  opacity: 0.85;
+  transition: opacity 0.1s;
+}
+.lifted {
+  transform: scale(1.04);
+  box-shadow: 0 12px 32px rgba(0,0,0,0.20);
+  z-index: 500;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+/* ── Floating Toolbar (Task 6) ── */
+.floating-toolbar-wrap {
+  position: fixed;
+  bottom: 68px;      /* sits above BottomNav */
+  left: 0;
+  right: 0;
+  z-index: 300;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+}
+.floating-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 6px 10px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+  pointer-events: all;
+  overflow-x: auto;
+  max-width: calc(100vw - 24px);
+}
+.ft-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  background: none;
+  border: none;
+  border-radius: 10px;
+  padding: 6px 8px;
+  min-width: 44px;
+  cursor: pointer;
+  color: var(--text);
+  transition: background 0.1s;
+}
+.ft-btn:hover { background: var(--border-light); }
+.ft-btn:active { background: var(--border); }
+.ft-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.ft-btn--danger { color: var(--accent); }
+.ft-btn--active { color: var(--accent); }
+.ft-icon { font-size: 1.1rem; line-height: 1; }
+.ft-label { font-size: 0.6rem; line-height: 1; color: var(--muted); white-space: nowrap; }
+.ft-sep { width: 1px; height: 28px; background: var(--border); margin: 0 4px; flex-shrink: 0; }
+
+/* Panel above toolbar */
+.ft-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 10px 12px;
+  margin-bottom: 6px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+  pointer-events: all;
+  max-width: calc(100vw - 24px);
+}
+.ft-panel-colors {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.ft-panel-swatch {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+}
+.ft-panel-swatch--none {
+  background: var(--canvas-bg) !important;
+  color: var(--muted);
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ft-panel-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.ft-panel-input {
+  flex: 1;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 0.9rem;
+  outline: none;
+  background: var(--surface);
+  color: var(--text);
+}
+.ft-panel-input:focus { border-color: var(--accent); }
+.ft-panel-done {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+/* ── Image caption (Task 7) ── */
+.image-caption {
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-align: center;
+  padding: 4px 6px 2px;
+  line-height: 1.3;
+  word-break: break-word;
+}
+
+/* ── Image Preview / Collection Gallery (Tasks 8 & 9) ── */
+.preview-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.88);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.preview-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: rgba(255,255,255,0.15);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  font-size: 1.2rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+.preview-img-wrap {
+  max-width: 92vw;
+  max-height: 86vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.preview-img {
+  max-width: 100%;
+  max-height: 80vh;
+  object-fit: contain;
+  border-radius: 8px;
+  display: block;
+}
+.preview-caption {
+  color: rgba(255,255,255,0.75);
+  font-size: 0.85rem;
+  margin-top: 10px;
+  text-align: center;
+  max-width: 80vw;
+}
+.gallery-counter {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: rgba(255,255,255,0.6);
+  font-size: 0.85rem;
+}
+.gallery-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(255,255,255,0.15);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  width: 48px;
+  height: 48px;
+  font-size: 1.6rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.gallery-arrow--left  { left: 16px; }
+.gallery-arrow--right { right: 16px; }
+.gallery-img {
+  max-width: 100%;
+  max-height: 80vh;
+  object-fit: contain;
+  border-radius: 8px;
+  display: block;
+}
+.gallery-empty {
+  color: rgba(255,255,255,0.6);
+  font-size: 1rem;
+}
+
+/* ── Idea mic button (moved to drag-handle, no popup) ── */
+.idea-mic-btn {
+  margin-left: auto;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 2px 4px;
+  border-radius: 6px;
+}
+.idea-mic-btn.listening { color: var(--accent); }
+
+/* ── Palette add button in header ── */
+.palette-add-btn {
+  margin-left: auto;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  color: var(--text);
+}
+
+/* ── Locked element indicator ── */
+.draggable-card.selected .el-card[data-locked="true"] {
+  outline-color: var(--muted);
+}

@@ -1,4 +1,4 @@
-export default function DocumentObject({ el, selected, onDelete }) {
+export default function DocumentObject({ el, selected }) {
   function openDoc(e) {
     e.stopPropagation()
     if (!el.content.src) return
@@ -16,12 +16,6 @@ export default function DocumentObject({ el, selected, onDelete }) {
 
   return (
     <div style={{ position: 'relative' }}>
-      {selected && (
-        <div className="img-popup-menu" onPointerDown={e => e.stopPropagation()}>
-          <button className="img-popup-btn img-popup-delete" onPointerDown={e => e.stopPropagation()}
-            onClick={e => { e.stopPropagation(); onDelete() }}>×</button>
-        </div>
-      )}
 
       <div className={`el-card el-document ${selected ? 'selected' : ''}`}>
         <div className="drag-handle">
