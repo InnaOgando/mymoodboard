@@ -578,23 +578,17 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
                 dropIntoCollection(el, pendingColId)
                 return
               }
-
-              if (selectedId === el.id && !el.locked) {
-                // Second tap behaviour varies by type
-                const type = normalizeType(el.type)
-                if (type === 'image') {
-                  setPreviewEl(el)
-                } else if (type === 'collection') {
-                  setGalleryEl(el)
-                } else if (type === 'palette') {
-                  setEditingId(el.id)
-                } else if (['idea', 'text', 'note', 'link', 'todo'].includes(type)) {
-                  setEditingId(el.id)
-                }
-              } else {
-                setSelectedId(el.id)
-                setEditingId(null)
-              }
+              // Single tap: select only. Secondary actions require double-tap.
+              setSelectedId(el.id)
+              setEditingId(null)
+            }}
+            onDoubleTap={() => {
+              if (el.locked) return
+              const type = normalizeType(el.type)
+              if (type === 'image') setPreviewEl(el)
+              else if (type === 'collection') setGalleryEl(el)
+              else if (type === 'palette') setEditingId(el.id)
+              else if (['idea', 'text', 'note', 'link', 'todo'].includes(type)) setEditingId(el.id)
             }}
           >
             <ObjectRenderer

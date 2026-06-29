@@ -1,9 +1,10 @@
 import { useRef } from 'react'
 
 const INTERACTIVE = new Set(['INPUT', 'TEXTAREA', 'SELECT', 'A'])
+const DOUBLE_TAP_MS = 320
 
 export default function DraggableCard({
-  x, y, scaleRef, onMove, onTap, onDragMove, onDragEnd,
+  x, y, scaleRef, onMove, onTap, onDoubleTap, onDragMove, onDragEnd,
   children, selected, alwaysDraggable, locked,
 }) {
   const isDragging = useRef(false)
@@ -14,6 +15,7 @@ export default function DraggableCard({
   const ref = useRef()
   const longTimer = useRef(null)
   const savedPointerId = useRef(null)
+  const lastTapTime = useRef(0)
 
   function cancelLong() {
     if (longTimer.current) {
@@ -24,7 +26,24 @@ export default function DraggableCard({
     ref.current?.classList.remove('lifted')
   }
 
+  function releasePrimaryCapture() {
+    if (savedPointerId.current !== null) {
+      try { ref.current?.releasePointerCapture(savedPointerId.current) } catch {}
+      savedPointerId.current = null
+    }
+  }
+
   function onPointerDown(e) {
+    // Non-primary pointer (second+ finger) = pinch/zoom gesture.
+    // Cancel any ongoing card interaction and let Canvas handle it.
+    // Do NOT stopPropagation so Canvas receives this pointer for pinch-zoom.
+    if (!e.isPrimary) {
+      cancelLong()
+      isDragging.current = false
+      releasePrimaryCapture()
+      return
+    }
+
     const isHandle = e.target.closest('.drag-handle')
     const isInteractive = INTERACTIVE.has(e.target.tagName) && !isHandle
     if (isInteractive) return
@@ -35,16 +54,14 @@ export default function DraggableCard({
     startPointer.current = { x: e.clientX, y: e.clientY }
     savedPointerId.current = e.pointerId
 
-    // Locked objects: tap only, no drag
-    if (locked) return
+    if (locked) return  // tap only, no drag
 
     if (alwaysDraggable) {
-      // Home-screen boards: direct drag, no long-press delay
       isDragging.current = true
       startPos.current = { x, y }
       ref.current?.setPointerCapture(e.pointerId)
     } else {
-      // Canvas objects: always require long press before moving (spec §3)
+      // Canvas objects always need long press before moving (spec §3)
       ref.current?.classList.add('long-pressing')
       const capturedX = x
       const capturedY = y
@@ -61,9 +78,10 @@ export default function DraggableCard({
   }
 
   function onPointerMove(e) {
+    if (!e.isPrimary) return
     const dx = e.clientX - startPointer.current.x
     const dy = e.clientY - startPointer.current.y
-    // Cancel long-press if finger moves significantly (user is scrolling canvas)
+    // Cancel long-press if finger moves significantly
     if (longTimer.current && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
       cancelLong()
     }
@@ -74,20 +92,28 @@ export default function DraggableCard({
     const nx = startPos.current.x + ndx
     const ny = startPos.current.y + ndy
     lastPos.current = { x: nx, y: ny }
-
     if (Math.abs(ndx) > 2 || Math.abs(ndy) > 2) moved.current = true
-
     onDragMove?.(nx, ny)
     if (moved.current) onMove?.(nx, ny)
   }
 
-  function onPointerUp() {
+  function onPointerUp(e) {
+    if (!e.isPrimary) return
     cancelLong()
     ref.current?.classList.remove('lifted')
+
     if (moved.current) {
       onDragEnd?.(lastPos.current.x, lastPos.current.y)
     } else {
-      onTap?.()
+      // Double-tap detection: two taps within DOUBLE_TAP_MS on the same element
+      const now = Date.now()
+      const isDoubleTap = now - lastTapTime.current < DOUBLE_TAP_MS
+      lastTapTime.current = isDoubleTap ? 0 : now  // reset after double-tap
+      if (isDoubleTap) {
+        onDoubleTap?.()
+      } else {
+        onTap?.()
+      }
     }
     isDragging.current = false
   }
