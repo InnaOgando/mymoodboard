@@ -111,7 +111,7 @@ export default function CollectionObject({
   }
 
   return (
-    <div style={{ position: 'relative', width: w }}>
+    <div style={{ position: 'relative', width: w, paddingBottom: selected ? 12 : 0 }}>
 
       {selected && showMenu && (
         <div className="col-menu-dropdown" onPointerDown={e => e.stopPropagation()}>
@@ -176,12 +176,13 @@ export default function CollectionObject({
           </div>
         )}
 
-        {selected && (
-          <ResizeHandle w={w} h={null} onResize={nw => onResize(nw, null)}
-            minW={Math.max(140, ...items.map(i => i.w || 150))}
-            scaleRef={scaleRef} />
-        )}
       </div>
+
+      {selected && (
+        <ResizeHandle w={w} h={null} onResize={nw => onResize(nw, null)}
+          minW={Math.max(140, ...items.map(i => i.w || 150))}
+          scaleRef={scaleRef} />
+      )}
     </div>
   )
 }

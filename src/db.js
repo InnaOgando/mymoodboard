@@ -382,14 +382,19 @@ export async function saveElement(el, { skipRemote = false } = {}) {
 export async function deleteElement(id) {
   const db = await getDB()
   await db.delete('elements', id)
+  // Queue tombstone BEFORE Supabase delete so the background sync (which reads
+  // pendingOps to decide what to skip) never writes the element back.
+  await _queueOp({ entity: 'element', op: 'delete', entityId: id })
   const userId = await currentUserId()
-  if (!userId) return
-  if (navigator.onLine) {
-    supabase.from('elements').delete().eq('id', id).eq('user_id', userId).catch(
-      e => console.warn('[db] deleteElement failed:', e.message)
-    )
-  } else {
-    await _queueOp({ entity: 'element', op: 'delete', entityId: id })
+  if (!userId || !navigator.onLine) return
+  try {
+    await supabase.from('elements').delete().eq('id', id).eq('user_id', userId)
+    // Remove tombstone only after Supabase confirms the delete
+    const ops = await db.getAll('pendingOps')
+    const op = ops.find(o => o.entity === 'element' && o.entityId === id)
+    if (op) await db.delete('pendingOps', op.id)
+  } catch (e) {
+    console.warn('[db] deleteElement Supabase failed, keeping tombstone:', e.message)
   }
 }
 

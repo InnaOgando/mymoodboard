@@ -174,11 +174,23 @@ export default function Canvas({
       lastPinchMid.current = { x: midX, y: midY }
     }
 
+    function capUp(e) {
+      pointers.current.delete(e.pointerId)
+      if (pointers.current.size < 2) {
+        lastPinchDist.current = null
+        lastPinchMid.current = null
+      }
+    }
+
     el.addEventListener('pointerdown', capDown, { capture: true })
     el.addEventListener('pointermove', capMove, { capture: true, passive: true })
+    el.addEventListener('pointerup', capUp, { capture: true })
+    el.addEventListener('pointercancel', capUp, { capture: true })
     return () => {
       el.removeEventListener('pointerdown', capDown, { capture: true })
       el.removeEventListener('pointermove', capMove, { capture: true })
+      el.removeEventListener('pointerup', capUp, { capture: true })
+      el.removeEventListener('pointercancel', capUp, { capture: true })
     }
   }, [])
 

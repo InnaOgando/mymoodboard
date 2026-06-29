@@ -435,7 +435,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
     } else if (type === 'palette') {
       const freePos = findFreePosition(elementsRef.current, childBoardsRef.current, vp, 200, 90)
       await addElement('palette', freePos, {
-        colors: ['#e8315a', '#f4845f', '#f7c948', '#4caf82', '#4a90d9']
+        colors: ['#e8315a']
       })
     } else {
       const freePos = findFreePosition(elementsRef.current, childBoardsRef.current, vp)

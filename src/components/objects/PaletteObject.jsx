@@ -167,10 +167,11 @@ export default function PaletteObject({ el, selected, editing, onUpdate, onResiz
           </div>
         )}
 
-        {selected && (
-          <ResizeHandle w={w} h={null} onResize={nw => onResize(nw, null)} minW={SWATCH_SIZE + 20} scaleRef={scaleRef} />
-        )}
       </div>
+
+      {selected && (
+        <ResizeHandle w={w} h={null} onResize={nw => onResize(nw, null)} minW={SWATCH_SIZE + 20} scaleRef={scaleRef} />
+      )}
     </div>
   )
 }
