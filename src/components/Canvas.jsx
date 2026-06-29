@@ -55,8 +55,10 @@ export default function Canvas({
         containerRef.current.setPointerCapture(e.pointerId)
       }
     } else if (pointers.current.size === 2) {
-      // Two fingers — switch to pinch zoom, cancel pan
+      // Two fingers — switch to pinch zoom, cancel pan.
+      // Reset didMove so a tap after pinch is not eaten as a canvas click.
       isPanning.current = false
+      didMove.current = false
       lastPinchDist.current = null
       lastPinchMid.current = null
     }
@@ -141,6 +143,7 @@ export default function Canvas({
       pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
       if (pointers.current.size === 2) {
         isPanning.current = false
+        didMove.current = false
         lastPinchDist.current = null
         lastPinchMid.current = null
       }

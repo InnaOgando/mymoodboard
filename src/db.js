@@ -34,6 +34,15 @@ export async function getDB() {
   })
 }
 
+// ── Pending-write guard ───────────────────────────────────────────────────────
+// These in-memory sets track element/board IDs whose Supabase upsert is still
+// in-flight. Background sync must skip these IDs so it never overwrites a local
+// change (create, update, move, resize, rename) with older server data.
+// The ID is removed once Supabase confirms the write (or on failure — the next
+// sync will then get the correct server state).
+const _pendingElementWrites = new Set()
+const _pendingBoardWrites   = new Set()
+
 // ── User identity ─────────────────────────────────────────────────────────────
 
 let _cachedUserId = null
@@ -237,11 +246,13 @@ async function _syncBoardsDown(pid, userId, db, pendingDeletes) {
 
   if (!data || data.length === 0) return
 
-  // Write all Supabase boards into IndexedDB
+  // Write all Supabase boards into IndexedDB, skipping any whose local write
+  // is still in-flight (delete tombstone OR pending upsert).
   const tx = db.transaction('boards', 'readwrite')
   for (const row of data) {
     const board = fromSupabaseBoard(row)
     if (pendingDeletes.has(board.id)) continue
+    if (_pendingBoardWrites.has(board.id)) continue
     await tx.objectStore('boards').put({ ...board, parentId: toParentId(board.parentId) })
   }
   await tx.done
@@ -277,9 +288,13 @@ export async function saveBoard(board) {
   await db.put('boards', normalized)
   const userId = await currentUserId()
   if (userId) {
-    supabase.from('boards').upsert(toSupabaseBoard(normalized, userId)).catch(
-      e => console.warn('[db] saveBoard upsert failed:', e.message)
-    )
+    _pendingBoardWrites.add(board.id)
+    supabase.from('boards').upsert(toSupabaseBoard(normalized, userId))
+      .then(() => _pendingBoardWrites.delete(board.id))
+      .catch(e => {
+        console.warn('[db] saveBoard upsert failed:', e.message)
+        _pendingBoardWrites.delete(board.id)
+      })
   }
 }
 
@@ -356,11 +371,13 @@ async function _syncElementsDown(boardId, userId, db, pendingDeletes) {
 
   if (!data || data.length === 0) return
 
-  // Write all Supabase elements into IndexedDB
+  // Write all Supabase elements into IndexedDB, skipping any whose local write
+  // is still in-flight (delete tombstone OR pending upsert).
   const tx = db.transaction('elements', 'readwrite')
   for (const row of data) {
     const el = fromSupabaseElement(row)
     if (pendingDeletes.has(el.id)) continue
+    if (_pendingElementWrites.has(el.id)) continue
     await tx.objectStore('elements').put(el)
   }
   await tx.done
@@ -372,9 +389,13 @@ export async function saveElement(el, { skipRemote = false } = {}) {
   if (!skipRemote) {
     const userId = await currentUserId()
     if (userId) {
-      supabase.from('elements').upsert(toSupabaseElement(el, userId)).catch(
-        e => console.warn('[db] saveElement upsert failed:', e.message)
-      )
+      _pendingElementWrites.add(el.id)
+      supabase.from('elements').upsert(toSupabaseElement(el, userId))
+        .then(() => _pendingElementWrites.delete(el.id))
+        .catch(e => {
+          console.warn('[db] saveElement upsert failed:', e.message)
+          _pendingElementWrites.delete(el.id)
+        })
     }
   }
 }

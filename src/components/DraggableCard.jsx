@@ -36,10 +36,13 @@ export default function DraggableCard({
   function onPointerDown(e) {
     // Non-primary pointer (second+ finger) = pinch/zoom gesture.
     // Cancel any ongoing card interaction and let Canvas handle it.
+    // Set moved=true so the pending primary-pointer onPointerUp does NOT
+    // fire onTap() when the primary finger eventually lifts.
     // Do NOT stopPropagation so Canvas receives this pointer for pinch-zoom.
     if (!e.isPrimary) {
       cancelLong()
       isDragging.current = false
+      moved.current = true  // suppress tap on primary-finger lift after pinch
       releasePrimaryCapture()
       return
     }
@@ -126,7 +129,15 @@ export default function DraggableCard({
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
-      onPointerCancel={onPointerUp}
+      onPointerCancel={e => {
+        // Cancel is not a user gesture completion — reset state silently,
+        // never fire onTap / onDoubleTap / onDragEnd.
+        if (!e.isPrimary) return
+        cancelLong()
+        ref.current?.classList.remove('lifted')
+        isDragging.current = false
+        moved.current = false
+      }}
     >
       {children}
     </div>
