@@ -170,6 +170,13 @@ export async function flushPendingOps() {
         await supabase.from('boards').delete().eq('id', op.entityId).eq('user_id', userId)
       } else if (op.entity === 'element' && op.op === 'delete') {
         await supabase.from('elements').delete().eq('id', op.entityId).eq('user_id', userId)
+      } else if (op.entity === 'element' && op.op === 'upsert') {
+        // Read the current local value (the one we saved while offline) and push it
+        const el = await db.get('elements', op.entityId)
+        if (el) await supabase.from('elements').upsert(toSupabaseElement(el, userId))
+      } else if (op.entity === 'board' && op.op === 'upsert') {
+        const b = await db.get('boards', op.entityId)
+        if (b) await supabase.from('boards').upsert(toSupabaseBoard(b, userId))
       } else if (op.entity === 'image' && op.op === 'upload') {
         continue // handled by ImageImportService.flushPendingImageUploads()
       }
@@ -184,6 +191,23 @@ async function _getPendingDeleteIds() {
   const db = await getDB()
   const ops = await db.getAll('pendingOps')
   return new Set(ops.filter(op => op.op === 'delete').map(op => op.entityId))
+}
+
+async function _getPendingUpsertIds() {
+  const db = await getDB()
+  const ops = await db.getAll('pendingOps')
+  return new Set(ops.filter(op => op.op === 'upsert').map(op => op.entityId))
+}
+
+// Queue an offline upsert. Uses a deterministic id ('upsert-el-{id}' / 'upsert-b-{id}')
+// so repeated saves to the same entity overwrite the previous queued op rather than
+// accumulating, e.g. during a drag-move sequence while offline.
+async function _queueUpsert(entity, entityId) {
+  const db = await getDB()
+  await db.put('pendingOps', {
+    id: `upsert-${entity.slice(0, 1)}-${entityId}`,
+    entity, entityId, op: 'upsert', queuedAt: Date.now()
+  })
 }
 
 // ── Boards ────────────────────────────────────────────────────────────────────
@@ -210,9 +234,11 @@ export async function getBoards(parentId = null, { onSync } = {}) {
     _syncBoardsDown(pid, userId, db, pendingDeletes)
       .then(async () => {
         if (!onSync) return
-        // Re-read IndexedDB after sync so React state gets the merged result
+        // Re-read pendingDeletes fresh so any boards deleted during the sync round-trip
+        // are excluded — the snapshot taken at getBoards() call time may be stale.
+        const freshDeletes = await _getPendingDeleteIds()
         let fresh = await db.getAllFromIndex('boards', 'parentId', pid)
-        fresh = fresh.filter(b => !pendingDeletes.has(b.id))
+        fresh = fresh.filter(b => !freshDeletes.has(b.id))
         onSync(fresh)
       })
       .catch(e => console.warn('[db] background board sync error:', e.message))
@@ -247,11 +273,13 @@ async function _syncBoardsDown(pid, userId, db, pendingDeletes) {
   if (!data || data.length === 0) return
 
   // Write all Supabase boards into IndexedDB, skipping any whose local write
-  // is still in-flight (delete tombstone OR pending upsert).
+  // is still in-flight (delete tombstone, pending upsert op, or in-memory guard).
+  const pendingUpserts = await _getPendingUpsertIds()
   const tx = db.transaction('boards', 'readwrite')
   for (const row of data) {
     const board = fromSupabaseBoard(row)
     if (pendingDeletes.has(board.id)) continue
+    if (pendingUpserts.has(board.id)) continue
     if (_pendingBoardWrites.has(board.id)) continue
     await tx.objectStore('boards').put({ ...board, parentId: toParentId(board.parentId) })
   }
@@ -266,7 +294,9 @@ export async function getBoard(id) {
     if (userId && navigator.onLine) {
       supabase.from('boards').select('*').eq('id', id).eq('user_id', userId).single()
         .then(({ data, error }) => {
-          if (!error && data) db.put('boards', { ...fromSupabaseBoard(data), parentId: toParentId(data.parent_id) })
+          if (!error && data && !_pendingBoardWrites.has(id)) {
+            db.put('boards', { ...fromSupabaseBoard(data), parentId: toParentId(data.parent_id) })
+          }
         })
         .catch(() => {})
     }
@@ -287,15 +317,21 @@ export async function saveBoard(board) {
   const normalized = { ...board, parentId: toParentId(board.parentId) }
   await db.put('boards', normalized)
   const userId = await currentUserId()
-  if (userId) {
-    _pendingBoardWrites.add(board.id)
-    supabase.from('boards').upsert(toSupabaseBoard(normalized, userId))
-      .then(() => _pendingBoardWrites.delete(board.id))
-      .catch(e => {
-        console.warn('[db] saveBoard upsert failed:', e.message)
-        _pendingBoardWrites.delete(board.id)
-      })
+  if (!userId) return
+  if (!navigator.onLine) {
+    // Queue a deduplicating upsert op so reconnect pushes the latest local state
+    await _queueUpsert('board', board.id)
+    return
   }
+  _pendingBoardWrites.add(board.id)
+  supabase.from('boards').upsert(toSupabaseBoard(normalized, userId))
+    .then(() => _pendingBoardWrites.delete(board.id))
+    .catch(async e => {
+      console.warn('[db] saveBoard upsert failed:', e.message)
+      _pendingBoardWrites.delete(board.id)
+      // Write failed — queue for retry on reconnect
+      await _queueUpsert('board', board.id)
+    })
 }
 
 export async function deleteBoard(id) {
@@ -337,8 +373,9 @@ export async function getElements(boardId, { onSync } = {}) {
     _syncElementsDown(boardId, userId, db, pendingDeletes)
       .then(async () => {
         if (!onSync) return
+        const freshDeletes = await _getPendingDeleteIds()
         let fresh = await db.getAllFromIndex('elements', 'boardId', boardId)
-        fresh = fresh.filter(el => !pendingDeletes.has(el.id))
+        fresh = fresh.filter(el => !freshDeletes.has(el.id))
         onSync(fresh)
       })
       .catch(e => console.warn('[db] background element sync error:', e.message))
@@ -372,11 +409,13 @@ async function _syncElementsDown(boardId, userId, db, pendingDeletes) {
   if (!data || data.length === 0) return
 
   // Write all Supabase elements into IndexedDB, skipping any whose local write
-  // is still in-flight (delete tombstone OR pending upsert).
+  // is still in-flight (delete tombstone, persistent upsert op, or in-memory guard).
+  const pendingUpserts = await _getPendingUpsertIds()
   const tx = db.transaction('elements', 'readwrite')
   for (const row of data) {
     const el = fromSupabaseElement(row)
     if (pendingDeletes.has(el.id)) continue
+    if (pendingUpserts.has(el.id)) continue
     if (_pendingElementWrites.has(el.id)) continue
     await tx.objectStore('elements').put(el)
   }
@@ -386,18 +425,21 @@ async function _syncElementsDown(boardId, userId, db, pendingDeletes) {
 export async function saveElement(el, { skipRemote = false } = {}) {
   const db = await getDB()
   await db.put('elements', el)
-  if (!skipRemote) {
-    const userId = await currentUserId()
-    if (userId) {
-      _pendingElementWrites.add(el.id)
-      supabase.from('elements').upsert(toSupabaseElement(el, userId))
-        .then(() => _pendingElementWrites.delete(el.id))
-        .catch(e => {
-          console.warn('[db] saveElement upsert failed:', e.message)
-          _pendingElementWrites.delete(el.id)
-        })
-    }
+  if (skipRemote) return
+  const userId = await currentUserId()
+  if (!userId) return
+  if (!navigator.onLine) {
+    await _queueUpsert('element', el.id)
+    return
   }
+  _pendingElementWrites.add(el.id)
+  supabase.from('elements').upsert(toSupabaseElement(el, userId))
+    .then(() => _pendingElementWrites.delete(el.id))
+    .catch(async e => {
+      console.warn('[db] saveElement upsert failed:', e.message)
+      _pendingElementWrites.delete(el.id)
+      await _queueUpsert('element', el.id)
+    })
 }
 
 export async function deleteElement(id) {

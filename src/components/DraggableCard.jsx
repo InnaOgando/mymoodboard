@@ -105,9 +105,9 @@ export default function DraggableCard({
     cancelLong()
     ref.current?.classList.remove('lifted')
 
-    if (moved.current) {
+    if (moved.current && isDragging.current) {
       onDragEnd?.(lastPos.current.x, lastPos.current.y)
-    } else {
+    } else if (!moved.current) {
       // Double-tap detection: two taps within DOUBLE_TAP_MS on the same element
       const now = Date.now()
       const isDoubleTap = now - lastTapTime.current < DOUBLE_TAP_MS
