@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { buildToolbarConfig, PANEL_DEFS } from './toolbarConfig'
+import { TOOLBAR_CONFIG, PANEL_DEFS } from './toolbarConfig'
 
-const CREATE_LEFT  = [
+// Creation mode buttons — order matches PRODUCT_SPEC.md §BottomNav
+const CREATE_LEFT = [
   { type: 'idea',    icon: '/text.png',  label: 'Idea' },
   { type: 'link',    icon: '/link.png',  label: 'Link' },
   { type: 'palette', icon: '/color.png', label: 'Palette' },
@@ -15,16 +16,19 @@ const CREATE_RIGHT = [
 /**
  * Single bottom toolbar for the entire app.
  *
- * No selection  → creation buttons (Idea / Link / Palette / Board / Todo / Image / Doc)
- * Selection      → contextual actions driven by toolbarConfig.js
+ * Responsibilities:
+ *   1. Read TOOLBAR_CONFIG / PANEL_DEFS from toolbarConfig.js
+ *   2. Evaluate per-item rules (visible, active, label, icon) against selectedEl
+ *   3. Render buttons and dispatch actions
  *
- * key={selectedId || 'create'} in the parent ensures React unmounts/remounts
- * this component on selection change, resetting all panel state automatically.
+ * No object-specific business logic lives here.
+ * To change toolbar content, edit toolbarConfig.js only.
+ *
+ * key={selectedId || 'create'} in the parent resets panel state on selection change.
  */
 export default function BoardToolbar({ selectedEl, selectedType, onAction, ...actions }) {
   const [panel, setPanel]         = useState(null)
   const [panelText, setPanelText] = useState('')
-  const locked = !!selectedEl?.locked
 
   // ── No selection → creation toolbar ────────────────────────────────────────
   if (!selectedEl) {
@@ -53,13 +57,35 @@ export default function BoardToolbar({ selectedEl, selectedType, onAction, ...ac
   }
 
   // ── Selection → config-driven contextual toolbar ────────────────────────────
-  const config   = buildToolbarConfig({ el: selectedEl, locked })
-  const items    = config[selectedType] ?? []
+
+  // Evaluate a config field that can be a static value or a function of el
+  const resolve = (field, el) => typeof field === 'function' ? field(el) : field
+
+  const allItems = TOOLBAR_CONFIG[selectedType] ?? []
+
+  // Apply visibility rules — separators are kept unless they would be adjacent or leading
+  const visibleItems = allItems.reduce((acc, item) => {
+    if (item.sep) {
+      // Suppress leading sep and consecutive seps
+      if (acc.length === 0 || acc[acc.length - 1].sep) return acc
+      acc.push(item)
+    } else {
+      const isVisible = !item.visible || item.visible(selectedEl)
+      if (isVisible) acc.push(item)
+    }
+    return acc
+  }, [])
+  // Also suppress a trailing separator
+  while (visibleItems.length && visibleItems[visibleItems.length - 1].sep) {
+    visibleItems.pop()
+  }
+
   const panelDef = panel ? PANEL_DEFS[panel] : null
 
   function handleItemClick(item) {
     if (item.panel) {
-      if (item.initText !== undefined) setPanelText(item.initText)
+      const text = item.initText ? item.initText(selectedEl) : ''
+      setPanelText(text)
       setPanel(p => p === item.panel ? null : item.panel)
     } else if (item.action) {
       actions[item.action]?.()
@@ -116,9 +142,14 @@ export default function BoardToolbar({ selectedEl, selectedType, onAction, ...ac
 
       {/* Button row */}
       <div className="bottom-nav obj-toolbar">
-        {items.map(item => {
+        {visibleItems.map(item => {
           if (item.sep) return <div key={item.id} className="ft-sep" />
-          const isActive = item.active || panel === item.panel
+
+          const label    = resolve(item.label, selectedEl)
+          const icon     = resolve(item.icon,  selectedEl)
+          const iconSt   = item.iconStyle ? item.iconStyle(selectedEl) : null
+          const isActive = (item.active && item.active(selectedEl)) || panel === item.panel
+
           return (
             <button
               key={item.id}
@@ -129,11 +160,11 @@ export default function BoardToolbar({ selectedEl, selectedType, onAction, ...ac
               ].filter(Boolean).join(' ')}
               onClick={() => handleItemClick(item)}
             >
-              {item.iconStyle
-                ? <span className="ft-icon" style={item.iconStyle} />
-                : <span className="ft-icon">{item.icon}</span>
+              {iconSt
+                ? <span className="ft-icon" style={iconSt} />
+                : <span className="ft-icon">{icon}</span>
               }
-              <span className="ft-label">{item.label}</span>
+              <span className="ft-label">{label}</span>
             </button>
           )
         })}

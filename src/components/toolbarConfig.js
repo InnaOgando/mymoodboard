@@ -1,13 +1,45 @@
+/**
+ * Toolbar configuration — single source of truth for all object actions.
+ *
+ * Adding or changing a toolbar action requires editing only this file.
+ * BoardToolbar contains no object-specific logic; it only reads and renders.
+ *
+ * ── Item shape ───────────────────────────────────────────────────────────────
+ *
+ *   id        string       React key + action identifier
+ *   sep?      bool         Renders a visual separator; no other fields used
+ *
+ *   label     string | (el) => string    Button label
+ *   icon?     string | (el) => string    Emoji / symbol for the icon span
+ *   iconStyle? (el) => CSSProperties    Alternative to icon for dynamic swatches
+ *
+ *   action?   string       Key in the actions prop passed to BoardToolbar
+ *   panel?    string       Panel id to toggle (see PANEL_DEFS)
+ *   initText? (el) => string   Seeds the text input when the panel opens
+ *
+ *   visible?  (el) => bool   When false the item is hidden (default: always shown)
+ *   active?   (el) => bool   When true the button gets active styling
+ *   danger?   bool           Applies danger/destructive styling
+ *
+ * ── Panel shape (PANEL_DEFS) ─────────────────────────────────────────────────
+ *
+ *   type        'colors' | 'text'
+ *   colors?     string[]           Swatch colours (type === 'colors')
+ *   activeColor? (el) => string    Currently selected colour
+ *   onSelect?   (color, actions) => void
+ *   placeholder? string            Input placeholder (type === 'text')
+ *   onSubmit?   (text, actions) => void
+ */
+
 import { PRESET_COLORS } from '../colors'
 
-// Colours for the Idea background colour panel
-export const BG_COLORS = [
+// ── Panel definitions ─────────────────────────────────────────────────────────
+
+const BG_COLORS = [
   '#ffffff', '#fff9c4', '#ffe0e0', '#e0f0ff',
   '#e0ffe8', '#f3e0ff', '#ffe8d0', '#e8e8e8',
 ]
 
-// Panel definitions — keyed by panel id.
-// BoardToolbar reads this to know how to render the active panel.
 export const PANEL_DEFS = {
   bgColor: {
     type: 'colors',
@@ -24,102 +56,78 @@ export const PANEL_DEFS = {
   caption: {
     type: 'text',
     placeholder: 'Add caption…',
-    initText: el => el?.content?.caption ?? '',
     onSubmit: (text, actions) => actions.onCaption?.(text),
   },
   title: {
     type: 'text',
     placeholder: 'Add title…',
-    initText: el => el?.content?.title ?? '',
     onSubmit: (text, actions) => actions.onAddTitle?.(text),
   },
 }
 
-// Sentinel for visual separators in the toolbar row
-const SEP = { id: '__sep__', sep: true }
+// ── Reusable action descriptors ───────────────────────────────────────────────
 
-// Common actions shared by all non-collection types.
-// locked is evaluated at call time so active/hidden state is baked in.
-function commonItems(locked) {
-  return [
+const LOCK   = { id: 'lock',   label: el => el.locked ? 'Locked' : 'Lock', icon: el => el.locked ? '🔒' : '🔓', action: 'onLock',      active:  el => !!el.locked }
+const GROUP  = { id: 'group',  label: 'Group',  icon: '⊞', action: 'onGroup',     visible: el => !el.locked }
+const COPY   = { id: 'copy',   label: 'Copy',   icon: '⊡', action: 'onCopy' }
+const CUT    = { id: 'cut',    label: 'Cut',    icon: '✂', action: 'onCut',       visible: el => !el.locked }
+const DUP    = { id: 'dup',    label: 'Dup',    icon: '⧉', action: 'onDuplicate' }
+const DELETE = { id: 'delete', label: 'Delete', icon: '×', action: 'onDelete',    danger:  true, visible: el => !el.locked }
+
+const SEP    = { id: '__sep__', sep: true }
+
+// Common trailing actions for all non-collection types.
+// Types that have a leading type-specific action prepend a separator themselves.
+const COMMON = [LOCK, GROUP, COPY, CUT, DUP, DELETE]
+
+// ── Toolbar configuration per object type ─────────────────────────────────────
+
+export const TOOLBAR_CONFIG = {
+  image: [
+    { id: 'caption',  label: 'Caption', icon: '✏',
+      panel: 'caption', initText: el => el?.content?.caption ?? '' },
     SEP,
-    { id: 'lock',   label: locked ? 'Locked' : 'Lock', icon: locked ? '🔒' : '🔓', active: locked, action: 'onLock' },
-    ...(!locked ? [{ id: 'group',  label: 'Group',  icon: '⊞', action: 'onGroup' }] : []),
-    { id: 'copy',   label: 'Copy',   icon: '⊡', action: 'onCopy' },
-    ...(!locked ? [{ id: 'cut',    label: 'Cut',    icon: '✂', action: 'onCut' }] : []),
-    { id: 'dup',    label: 'Dup',    icon: '⧉', action: 'onDuplicate' },
-    ...(!locked ? [{ id: 'delete', label: 'Delete', icon: '×', danger: true, action: 'onDelete' }] : []),
-  ]
-}
+    ...COMMON,
+  ],
 
-/**
- * Build the full toolbar config for the current selection.
- *
- * Each item shape:
- *   { id, label, icon?, iconStyle?, action?, panel?, initText?, danger?, active?, sep? }
- *
- * sep:       renders a visual separator, no other fields needed
- * action:    key into the `actions` prop object in BoardToolbar
- * panel:     panel id to toggle; BoardToolbar matches it against PANEL_DEFS
- * initText:  initial value to seed the text input when a panel opens
- * iconStyle: object spread onto the icon <span> style when `icon` is absent
- * danger:    applies danger styling
- * active:    applies active styling (e.g. Lock when locked, open panel btn)
- */
-export function buildToolbarConfig({ el, locked }) {
-  const c = commonItems(locked)
+  idea: [
+    { id: 'bgColor',  label: 'Color',
+      iconStyle: el => ({
+        width: 18, height: 18, borderRadius: 4, display: 'inline-block',
+        background: el?.content?.bgColor || '#fff',
+        border: '1px solid #ccc', verticalAlign: 'middle',
+      }),
+      panel: 'bgColor' },
+    SEP,
+    ...COMMON,
+  ],
 
-  return {
-    image: [
-      {
-        id: 'caption', label: 'Caption', icon: '✏',
-        panel: 'caption', initText: el?.content?.caption ?? '',
-      },
-      ...c,
-    ],
+  todo: [
+    { id: 'title',    label: 'Title', icon: 'T',
+      panel: 'title', initText: el => el?.content?.title ?? '' },
+    SEP,
+    ...COMMON,
+  ],
 
-    idea: [
-      {
-        id: 'bgColor', label: 'Color',
-        iconStyle: {
-          width: 18, height: 18, borderRadius: 4, display: 'inline-block',
-          background: el?.content?.bgColor || '#fff',
-          border: '1px solid #ccc', verticalAlign: 'middle',
-        },
-        panel: 'bgColor',
-      },
-      ...c,
-    ],
+  palette: [
+    { id: 'edit', label: 'Edit', icon: '🎨', action: 'onEdit' },
+    SEP,
+    ...COMMON,
+  ],
 
-    todo: [
-      {
-        id: 'title', label: 'Title', icon: 'T',
-        panel: 'title', initText: el?.content?.title ?? '',
-      },
-      ...c,
-    ],
+  link: [
+    { id: 'edit', label: 'Edit', icon: '✏', action: 'onEdit' },
+    SEP,
+    ...COMMON,
+  ],
 
-    palette: [
-      { id: 'edit', label: 'Edit', icon: '🎨', action: 'onEdit' },
-      ...c,
-    ],
+  document: COMMON,
 
-    link: [
-      { id: 'edit', label: 'Edit', icon: '✏', action: 'onEdit' },
-      ...c,
-    ],
-
-    document: c,
-
-    collection: [
-      { id: 'rename', label: 'Rename', icon: '✏', action: 'onRename' },
-      { id: 'color',  label: 'Color',  icon: '🎨', panel: 'colColor' },
-      SEP,
-      { id: 'dup',    label: 'Dup',    icon: '⧉', action: 'onDuplicate' },
-      { id: 'delete', label: 'Delete', icon: '×',  danger: true, action: 'onDelete' },
-    ],
-
-    // No selection — toolbar is in creation mode, no items needed here
-    none: [],
-  }
+  collection: [
+    { id: 'rename', label: 'Rename', icon: '✏', action: 'onRename' },
+    { id: 'color',  label: 'Color',  icon: '🎨', panel: 'colColor' },
+    SEP,
+    DUP,
+    DELETE,
+  ],
 }
