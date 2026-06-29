@@ -956,8 +956,10 @@ body {
 
 .collection-items {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px;
 }
 
 .collection-empty {
@@ -970,10 +972,15 @@ body {
 
 .collection-item-wrap {
   position: relative;
-  width: 100%;
+  /* Images are flex: none at their stored width.
+     Text items (idea/link/todo) stretch to fill the row. */
+  flex: none;
+}
+.collection-item-wrap--text {
+  flex: 1 1 100%;
+  min-width: 0;
 }
 .collection-item-wrap img {
-  width: 100%;
   height: auto;
   display: block;
   pointer-events: none;

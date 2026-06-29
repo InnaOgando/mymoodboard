@@ -35,7 +35,8 @@ function CollectionItem({ item }) {
         <CachedImage
           src={item.content.src}
           hash={item.content.hash}
-          style={{ width: '100%', display: 'block' }}
+          // Images display at their stored width — never resize inside a collection
+          style={{ width: item.w || 150, height: 'auto', display: 'block', maxWidth: '100%' }}
           draggable={false}
         />
       )
@@ -156,8 +157,10 @@ export default function CollectionObject({
           <div className="collection-empty">Drag objects here</div>
         ) : (
           <div className="collection-items">
-            {items.map(item => (
-              <div key={item.id} className="collection-item-wrap">
+            {items.map(item => {
+              const isText = normalizeType(item.type) !== 'image'
+              return (
+              <div key={item.id} className={`collection-item-wrap${isText ? ' collection-item-wrap--text' : ''}`}>
                 <CollectionItem item={item} />
                 {selected && (
                   <button
@@ -168,7 +171,8 @@ export default function CollectionObject({
                   >↗</button>
                 )}
               </div>
-            ))}
+              )
+            })}
           </div>
         )}
 
