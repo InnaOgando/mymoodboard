@@ -66,31 +66,11 @@ export default function Canvas({
     if (!pointers.current.has(e.pointerId)) return
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
 
-    if (pointers.current.size === 2) {
-      // Pinch zoom
-      const [a, b] = [...pointers.current.values()]
-      const dist = Math.hypot(b.x - a.x, b.y - a.y)
-      const midX = (a.x + b.x) / 2
-      const midY = (a.y + b.y) / 2
-      const rect = getRect()
+    // Pinch zoom is handled by the native capture-phase listener (see useEffect below),
+    // which sees both pointers even when one is captured by a DraggableCard.
+    if (pointers.current.size === 2) return
 
-      if (lastPinchDist.current !== null) {
-        const ratio = dist / lastPinchDist.current
-        const oldScale = scaleRef.current
-        const newScale = Math.min(Math.max(oldScale * ratio, 0.1), 8)
-        const mx = midX - rect.left
-        const my = midY - rect.top
-        offsetRef.current = {
-          x: mx - (mx - offsetRef.current.x) * (newScale / oldScale),
-          y: my - (my - offsetRef.current.y) * (newScale / oldScale),
-        }
-        scaleRef.current = newScale
-        applyTransform()
-      }
-      lastPinchDist.current = dist
-      lastPinchMid.current = { x: midX, y: midY }
-
-    } else if (pointers.current.size === 1 && isPanning.current) {
+    if (pointers.current.size === 1 && isPanning.current) {
       // Pan
       const dx = e.clientX - panStart.current.px
       const dy = e.clientY - panStart.current.py
@@ -147,6 +127,59 @@ export default function Canvas({
     if (!el) return
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)
+  }, [])
+
+  // Capture-phase native listeners see ALL pointer events before any child's
+  // stopPropagation runs and before pointer capture redirects events to a child.
+  // This is the only way to track both fingers for pinch-zoom when one finger
+  // lands on a DraggableCard that captures its pointer after long-press.
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+
+    function capDown(e) {
+      pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+      if (pointers.current.size === 2) {
+        isPanning.current = false
+        lastPinchDist.current = null
+        lastPinchMid.current = null
+      }
+    }
+
+    function capMove(e) {
+      if (!pointers.current.has(e.pointerId)) return
+      pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+      if (pointers.current.size !== 2) return
+
+      const [a, b] = [...pointers.current.values()]
+      const dist = Math.hypot(b.x - a.x, b.y - a.y)
+      const midX = (a.x + b.x) / 2
+      const midY = (a.y + b.y) / 2
+      const rect = el.getBoundingClientRect()
+
+      if (lastPinchDist.current !== null) {
+        const ratio = dist / lastPinchDist.current
+        const oldScale = scaleRef.current
+        const newScale = Math.min(Math.max(oldScale * ratio, 0.1), 8)
+        const mx = midX - rect.left
+        const my = midY - rect.top
+        offsetRef.current = {
+          x: mx - (mx - offsetRef.current.x) * (newScale / oldScale),
+          y: my - (my - offsetRef.current.y) * (newScale / oldScale),
+        }
+        scaleRef.current = newScale
+        applyTransform()
+      }
+      lastPinchDist.current = dist
+      lastPinchMid.current = { x: midX, y: midY }
+    }
+
+    el.addEventListener('pointerdown', capDown, { capture: true })
+    el.addEventListener('pointermove', capMove, { capture: true, passive: true })
+    return () => {
+      el.removeEventListener('pointerdown', capDown, { capture: true })
+      el.removeEventListener('pointermove', capMove, { capture: true })
+    }
   }, [])
 
   // After every React re-render, restore the transform that was set via direct DOM
