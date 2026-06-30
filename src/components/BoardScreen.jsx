@@ -62,8 +62,10 @@ function findFreePosition(existingElements, childBoards, viewportBounds, objW = 
     y += objH + GAP
   }
 
-  // Viewport full — overflow downward from start
-  return { x: Math.round(startX), y: Math.round(startY + viewportBounds.h) }
+  // Viewport full — place just below the lowest box already on screen,
+  // not a full viewport away, so the new object stays beside current work.
+  const lowestBottom = allBoxes.reduce((max, o) => Math.max(max, o.y + o.h), startY)
+  return { x: Math.round(startX), y: Math.round(lowestBottom + GAP) }
 }
 
 export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, onHome }) {
@@ -112,7 +114,15 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
     async function handlePaste(e) {
       const items = Array.from(e.clipboardData?.items || [])
       const imgItem = items.find(i => i.type.startsWith('image/'))
-      if (!imgItem) return
+      if (!imgItem) {
+        // No image on the system clipboard — fall back to the object clipboard
+        // (Copy action) so Cmd+V completes the Copy → Paste workflow.
+        if (sessionStorage.getItem('refmemo_clipboard')) {
+          e.preventDefault()
+          pasteElement()
+        }
+        return
+      }
       e.preventDefault()
       const blob = imgItem.getAsFile()
       try {
@@ -260,19 +270,6 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
     }
     saveElement(ejected).catch(e => console.error('[eject] saveElement(ejected) failed:', e))
     setSelectedId(ejected.id)
-  }
-
-  async function duplicateCollection(col) {
-    const newCol = {
-      id: uid(), boardId, type: 'collection',
-      x: col.x + 40, y: col.y + 40,
-      w: col.w,
-      content: { ...col.content, items: getCollectionItems(col.content).map(item => ({ ...item, id: uid() })) },
-      createdAt: Date.now()
-    }
-    setElements(prev => [...prev, newCol])
-    setSelectedId(newCol.id)
-    saveElement(newCol).catch(e => console.error('[duplicateCollection] saveElement failed:', e))
   }
 
   // ── Lock / Copy / Cut / Paste / Duplicate ──────────────────────────────────
@@ -614,7 +611,6 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
               onResize={(w, h) => resizeElement(el.id, w, h)}
               onMakeCollection={() => makeCollection(el)}
               onEjectItem={itemId => ejectFromCollection(el.id, itemId)}
-              onDuplicate={() => duplicateCollection(el)}
               isDropTarget={dropOverCollectionId === el.id}
               scaleRef={scaleRef}
             />
@@ -638,6 +634,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
             onCopy={() => { if (selEl) copyElement(selEl) }}
             onCut={() => { if (selEl) cutElement(selEl) }}
             onDuplicate={() => { if (selEl) duplicateElement(selEl) }}
+            onPaste={pasteElement}
             onCaption={caption => setElementCaption(selectedId, caption)}
             onBgColor={color => setElementBgColor(selectedId, color)}
             onAddTitle={title => setTodoTitle(selectedId, title)}

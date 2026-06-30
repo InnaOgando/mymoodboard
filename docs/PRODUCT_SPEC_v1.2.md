@@ -242,7 +242,6 @@ One color swatch square rounded corners.
 Displays:
 
 - HEX
-- RGB
 
 Two taps edit color.
 

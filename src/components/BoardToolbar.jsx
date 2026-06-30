@@ -32,6 +32,7 @@ export default function BoardToolbar({ selectedEl, selectedType, onAction, ...ac
 
   // ── No selection → creation toolbar ────────────────────────────────────────
   if (!selectedEl) {
+    const hasClipboard = !!sessionStorage.getItem('refmemo_clipboard')
     return (
       <div className="bottom-bar board-bottom" onPointerDown={e => e.stopPropagation()}>
         <div className="bottom-nav">
@@ -51,6 +52,12 @@ export default function BoardToolbar({ selectedEl, selectedType, onAction, ...ac
               <span className="nav-label">{item.label}</span>
             </button>
           ))}
+          {hasClipboard && (
+            <button key="paste" className="nav-btn" onClick={() => actions.onPaste?.()}>
+              <span className="ft-icon">⧉</span>
+              <span className="nav-label">Paste</span>
+            </button>
+          )}
         </div>
       </div>
     )

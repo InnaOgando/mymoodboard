@@ -160,15 +160,19 @@ export default function Canvas({
       const midY = (a.y + b.y) / 2
       const rect = el.getBoundingClientRect()
 
-      if (lastPinchDist.current !== null) {
+      if (lastPinchDist.current !== null && lastPinchMid.current !== null) {
         const ratio = dist / lastPinchDist.current
         const oldScale = scaleRef.current
         const newScale = Math.min(Math.max(oldScale * ratio, 0.1), 8)
-        const mx = midX - rect.left
-        const my = midY - rect.top
+        // Use lastMid as the canvas anchor and currentMid as the screen target.
+        // This handles scale + midpoint translation in one step with no per-frame drift.
+        const lmx = lastPinchMid.current.x - rect.left
+        const lmy = lastPinchMid.current.y - rect.top
+        const cmx = midX - rect.left
+        const cmy = midY - rect.top
         offsetRef.current = {
-          x: mx - (mx - offsetRef.current.x) * (newScale / oldScale),
-          y: my - (my - offsetRef.current.y) * (newScale / oldScale),
+          x: cmx - (lmx - offsetRef.current.x) * ratio,
+          y: cmy - (lmy - offsetRef.current.y) * ratio,
         }
         scaleRef.current = newScale
         applyTransform()

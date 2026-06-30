@@ -1,7 +1,7 @@
 import { useRef } from 'react'
 
 const INTERACTIVE = new Set(['INPUT', 'TEXTAREA', 'SELECT', 'A'])
-const DOUBLE_TAP_MS = 320
+const DOUBLE_TAP_MS = 420
 
 export default function DraggableCard({
   x, y, scaleRef, onMove, onTap, onDoubleTap, onDragMove, onDragEnd,
@@ -50,7 +50,6 @@ export default function DraggableCard({
     const isHandle = e.target.closest('.drag-handle')
     const isInteractive = INTERACTIVE.has(e.target.tagName) && !isHandle
     if (isInteractive) return
-    if (e.target.closest('.resize-handle')) return
     e.stopPropagation()
 
     moved.current = false
@@ -59,11 +58,18 @@ export default function DraggableCard({
 
     if (locked) return  // tap only, no drag
 
+    // ResizeHandle owns its own drag gesture and only claims the pointer once
+    // real movement crosses its threshold (see ResizeHandle.jsx). The card
+    // must not also arm a long-press/drag for the same pointer, so resize and
+    // card-drag never compete — a plain tap here still falls through to the
+    // normal tap/double-tap handling below in onPointerUp.
+    const isResizeHandle = e.target.closest('.resize-handle')
+
     if (alwaysDraggable) {
       isDragging.current = true
       startPos.current = { x, y }
       ref.current?.setPointerCapture(e.pointerId)
-    } else {
+    } else if (!isResizeHandle) {
       // Canvas objects always need long press before moving (spec §3)
       ref.current?.classList.add('long-pressing')
       const capturedX = x

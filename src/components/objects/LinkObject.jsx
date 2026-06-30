@@ -15,17 +15,12 @@ export default function LinkObject({ el, selected, editing, onUpdate, onStopEdit
   const url = el.content.url || ''
 
   useEffect(() => {
-    if (editing) setTimeout(() => urlRef.current?.focus(), 50)
+    if (editing) urlRef.current?.focus()
   }, [editing])
 
   return (
     <div style={{ position: 'relative', width: w }}>
       <div className={`el-card el-link ${selected ? 'selected' : ''}`} style={{ width: w }}>
-        <div className="drag-handle">
-          <span className="handle-dots">⠿</span>
-          <span className="idea-label">Link</span>
-        </div>
-
         {editing ? (
           <div className="link-edit-col">
             <label className="link-field-label">URL</label>
