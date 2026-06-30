@@ -243,7 +243,14 @@ Displays:
 
 - HEX
 
-Two taps edit color.
+Two taps opens a color picker popover.
+
+Color picker:
+
+- Color wheel for hue and saturation.
+- HEX code displayed below the wheel.
+- Done button closes the picker.
+- Tapping outside the picker closes it.
 
 ---
 

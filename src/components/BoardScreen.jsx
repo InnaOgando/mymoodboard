@@ -620,7 +620,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
 
       {/* Single toolbar — swaps between creation and contextual mode based on selection */}
       {(() => {
-        const selEl  = selectedId ? elementsRef.current.find(e => e.id === selectedId) : null
+        const selEl  = selectedId ? elements.find(e => e.id === selectedId) : null
         const selType = selEl ? normalizeType(selEl.type) : null
         return (
           <BoardToolbar
