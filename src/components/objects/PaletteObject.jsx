@@ -45,8 +45,18 @@ export default function PaletteObject({ el, selected, editing, onUpdate, onResiz
     return () => document.removeEventListener('pointerdown', onDown)
   }, [pickerOpen])
 
+  const hasEyeDropper = typeof window !== 'undefined' && 'EyeDropper' in window
+
   function changeColor(hex) {
     onUpdate({ ...el.content, colors: colors.map((c, ci) => ci === idx ? hex : c) })
+  }
+
+  async function pickFromScreen() {
+    try {
+      const dropper = new window.EyeDropper()
+      const result = await dropper.open()
+      changeColor(result.sRGBHex)
+    } catch {}
   }
 
   return (
@@ -84,7 +94,14 @@ export default function PaletteObject({ el, selected, editing, onUpdate, onResiz
           <HexColorPicker color={colors[idx]} onChange={changeColor} />
           <div className="palette-picker-hex">
             <span className="palette-picker-hex-label">{colors[idx].toUpperCase()}</span>
-            <button className="palette-picker-done" onPointerDown={e => e.stopPropagation()} onClick={() => setPickerOpen(false)}>Done</button>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {hasEyeDropper && (
+                <button className="palette-picker-eyedropper" onPointerDown={e => e.stopPropagation()} onClick={pickFromScreen}>
+                  🩸
+                </button>
+              )}
+              <button className="palette-picker-done" onPointerDown={e => e.stopPropagation()} onClick={() => setPickerOpen(false)}>Done</button>
+            </div>
           </div>
         </div>
       )}

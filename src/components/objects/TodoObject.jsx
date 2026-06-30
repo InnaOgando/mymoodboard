@@ -1,8 +1,12 @@
-import { useRef } from 'react'
+import { useRef, useEffect } from 'react'
 import ResizeHandle from '../ResizeHandle'
 
-export default function TodoObject({ el, selected, onUpdate, onResize, scaleRef }) {
+export default function TodoObject({ el, selected, editing, onUpdate, onResize, scaleRef }) {
   const items = el.content.items?.length ? el.content.items : [{ id: Date.now(), text: '', done: false }]
+
+  useEffect(() => {
+    if (editing) setTimeout(() => inputRefs.current[0]?.focus(), 50)
+  }, [editing])
   const title = el.content.title || ''
   const w = el.w || 260
   const inputRefs = useRef({})
@@ -52,15 +56,18 @@ export default function TodoObject({ el, selected, onUpdate, onResize, scaleRef 
         {items.map((item, i) => (
           <div key={i} className="todo-item">
             <input type="checkbox" checked={!!item.done}
-              onChange={() => toggle(i)}
-              onPointerDown={e => e.stopPropagation()} />
+              onChange={() => editing && toggle(i)}
+              style={{ pointerEvents: editing ? 'auto' : 'none' }}
+              onPointerDown={e => editing && e.stopPropagation()} />
             <input
               ref={el => { inputRefs.current[i] = el }}
               className={`todo-input ${item.done ? 'done' : ''}`}
               value={item.text || ''}
+              readOnly={!editing}
+              style={{ pointerEvents: editing ? 'auto' : 'none' }}
               onChange={e => updateItem(i, e.target.value)}
               onKeyDown={e => handleKeyDown(e, i)}
-              onPointerDown={e => e.stopPropagation()}
+              onPointerDown={e => editing && e.stopPropagation()}
               placeholder="Task…"
             />
           </div>

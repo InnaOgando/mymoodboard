@@ -1253,6 +1253,14 @@ body {
   user-select: text;
   -webkit-user-select: text;
 }
+.palette-picker-eyedropper {
+  background: var(--surface-2, #f0f0f0);
+  border: none;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 1rem;
+  cursor: pointer;
+}
 .palette-picker-done {
   background: var(--accent, #e8315a);
   color: #fff;

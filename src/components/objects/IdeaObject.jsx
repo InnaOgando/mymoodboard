@@ -96,7 +96,8 @@ export default function IdeaObject({ el, selected, editing, onUpdate, onResize, 
         <textarea
           ref={textRef}
           className="card-textarea card-textarea-idea"
-          style={{ height: h - 32, width: '100%', color: listening && interim ? '#888' : 'inherit', background: 'transparent' }}
+          style={{ height: h - 32, width: '100%', color: listening && interim ? '#888' : 'inherit', background: 'transparent', pointerEvents: editing ? 'auto' : 'none' }}
+          readOnly={!editing}
           value={displayText}
           onChange={e => { if (!listening) onUpdate({ ...el.content, text: e.target.value }) }}
           placeholder="Your idea…"
