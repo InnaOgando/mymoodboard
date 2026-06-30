@@ -74,6 +74,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
   const [childBoards, setChildBoards] = useState([])
   const [selectedId, setSelectedId] = useState(null)
   const [editingId, setEditingId] = useState(null)
+  const [clipboardKey, setClipboardKey] = useState(0)
   const [showImagePicker, setShowImagePicker] = useState(false)
   const [dropOverCollectionId, _setDropOverCollectionId] = useState(null)
   const [undoStack, setUndoStack] = useState([])
@@ -87,6 +88,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
   // Ref for dropOverCollectionId so onTap can read it synchronously (iOS fix)
   const dropOverCollectionRef = useRef(null)
 
+  const palettePickerRefs = useRef(new Map())
   const undoTimer = useRef(null)
   const scaleRef = useRef(1)
   // Exposed to Canvas so we can compute viewport bounds for placement
@@ -298,6 +300,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
   function copyElement(el) {
     const { id: _id, boardId: _bid, ...rest } = el
     sessionStorage.setItem('refmemo_clipboard', JSON.stringify(rest))
+    setClipboardKey(k => k + 1)
   }
 
   function cutElement(el) {
@@ -320,6 +323,9 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
       setElements(prev => [...prev, el])
       setSelectedId(el.id)
       saveElement(el).catch(e => console.error('[paste]', e))
+      // Clear clipboard so the Paste button disappears immediately after use
+      sessionStorage.removeItem('refmemo_clipboard')
+      setClipboardKey(k => k + 1)
     } catch (e) { console.error('[paste] failed', e) }
   }
 
@@ -596,8 +602,16 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
               const type = normalizeType(el.type)
               if (type === 'image') setPreviewEl(el)
               else if (type === 'collection') setGalleryEl(el)
-              else if (type === 'palette') setEditingId(el.id)
-              else if (['idea', 'text', 'note', 'link', 'todo'].includes(type)) setEditingId(el.id)
+              else if (type === 'palette') palettePickerRefs.current.get(el.id)?.()
+              else if (type === 'link') {
+                const url = el.content?.url
+                if (url) {
+                  const a = document.createElement('a')
+                  a.href = url; a.target = '_blank'; a.rel = 'noreferrer noopener'
+                  document.body.appendChild(a); a.click(); document.body.removeChild(a)
+                }
+              }
+              else if (['idea', 'text', 'note', 'todo'].includes(type)) setEditingId(el.id)
             }}
           >
             <ObjectRenderer
@@ -613,6 +627,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
               onEjectItem={itemId => ejectFromCollection(el.id, itemId)}
               isDropTarget={dropOverCollectionId === el.id}
               scaleRef={scaleRef}
+              onRegisterPicker={fn => { if (fn) palettePickerRefs.current.set(el.id, fn); else palettePickerRefs.current.delete(el.id) }}
             />
           </DraggableCard>
         ))}
@@ -627,6 +642,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
             key={selectedId || 'create'}
             selectedEl={selEl}
             selectedType={selType}
+            clipboardKey={clipboardKey}
             onAction={handleNavAction}
             onDelete={() => removeElement(selectedId)}
             onLock={() => toggleLock(selectedId)}

@@ -44,12 +44,11 @@ export default function LinkObject({ el, selected, editing, onUpdate, onStopEdit
         ) : (
           <div className="link-view">
             {url
-              ? <a className="link-view-url" href={url} target="_blank" rel="noreferrer"
-                  onPointerDown={e => e.stopPropagation()}>
+              ? <span className="link-view-url">
                   <img src="/link.png" alt="" style={{ width: 12, height: 12, objectFit: 'contain', marginRight: 4, verticalAlign: 'middle', opacity: 0.6 }} />
                   {shortUrl(url)}
-                </a>
-              : <span className="link-view-url link-view-placeholder">Two taps to add URL</span>}
+                </span>
+              : <span className="link-view-url link-view-placeholder">Two taps to open URL</span>}
           </div>
         )}
         {selected && <ResizeHandle w={w} h={null} onResize={nw => onResize(nw, null)} minW={160} scaleRef={scaleRef} />}

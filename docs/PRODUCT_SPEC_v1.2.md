@@ -217,7 +217,9 @@ Contains only a URL.
 
 One tap → Select.
 
-Two taps → Edit.
+Two taps → Open URL in system browser.
+
+Edit URL via Edit button in the bottom toolbar.
 
 ---
 
@@ -243,14 +245,12 @@ Displays:
 
 - HEX
 
-Two taps opens a color picker popover.
+Two taps → Opens the operating system native color picker.
 
-Color picker:
+After selecting a color:
 
-- Color wheel for hue and saturation.
-- HEX code displayed below the wheel.
-- Done button closes the picker.
-- Tapping outside the picker closes it.
+- The swatch updates immediately.
+- The HEX value updates immediately.
 
 ---
 
@@ -307,6 +307,7 @@ Palette:
 
 Link:
 
+- Edit
 - Delete
 - Lock
 - Group

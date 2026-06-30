@@ -26,7 +26,7 @@ const CREATE_RIGHT = [
  *
  * key={selectedId || 'create'} in the parent resets panel state on selection change.
  */
-export default function BoardToolbar({ selectedEl, selectedType, onAction, ...actions }) {
+export default function BoardToolbar({ selectedEl, selectedType, onAction, clipboardKey: _ck, ...actions }) {
   const [panel, setPanel]         = useState(null)
   const [panelText, setPanelText] = useState('')
 

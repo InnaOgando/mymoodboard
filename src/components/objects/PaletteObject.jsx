@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from 'react'
-import { HexColorPicker } from 'react-colorful'
 import ResizeHandle from '../ResizeHandle'
 
 // Backward compat: old `color` type used { color: '#hex' }
@@ -20,43 +19,25 @@ function isLightColor(hex) {
 
 const SWATCH_SIZE = 90
 
-export default function PaletteObject({ el, selected, editing, onUpdate, onResize, scaleRef }) {
+export default function PaletteObject({ el, selected, onUpdate, onResize, scaleRef, onRegisterPicker }) {
   const colors = getPaletteColors(el.content)
   const [activeIdx, setActiveIdx] = useState(0)
-  const [pickerOpen, setPickerOpen] = useState(false)
   const [copiedIdx, setCopiedIdx] = useState(null)
   const idx = Math.min(activeIdx, colors.length - 1)
+  const inputRefs = useRef({})
+  const activeIdxRef = useRef(idx)
+  activeIdxRef.current = idx
   const size = el.w || SWATCH_SIZE
   const w = size * colors.length + 6 * (colors.length - 1)
-  const pickerRef = useRef()
 
-  // Double-tap (editing prop) opens picker for the active swatch
+  // Register once — the function always reads the current active swatch via ref.
   useEffect(() => {
-    if (editing) setPickerOpen(true)
-  }, [editing])
+    onRegisterPicker?.(() => inputRefs.current[activeIdxRef.current]?.click())
+    return () => onRegisterPicker?.(null)
+  }, [])
 
-  // Close picker on outside tap
-  useEffect(() => {
-    if (!pickerOpen) return
-    function onDown(e) {
-      if (!pickerRef.current?.contains(e.target)) setPickerOpen(false)
-    }
-    document.addEventListener('pointerdown', onDown)
-    return () => document.removeEventListener('pointerdown', onDown)
-  }, [pickerOpen])
-
-  const hasEyeDropper = typeof window !== 'undefined' && 'EyeDropper' in window
-
-  function changeColor(hex) {
-    onUpdate({ ...el.content, colors: colors.map((c, ci) => ci === idx ? hex : c) })
-  }
-
-  async function pickFromScreen() {
-    try {
-      const dropper = new window.EyeDropper()
-      const result = await dropper.open()
-      changeColor(result.sRGBHex)
-    } catch {}
+  function changeColor(i, hex) {
+    onUpdate({ ...el.content, colors: colors.map((c, ci) => ci === i ? hex : c) })
   }
 
   return (
@@ -70,7 +51,17 @@ export default function PaletteObject({ el, selected, editing, onUpdate, onResiz
                 className={`palette-swatch-sq ${light ? 'palette-swatch-sq--light' : ''} ${i === idx ? 'active' : ''}`}
                 style={{ background: color, width: size, height: size }}
                 onClick={() => setActiveIdx(i)}
-              />
+              >
+                {/* Native OS color picker — always in DOM so trigger can .click() it synchronously */}
+                <input
+                  ref={node => { inputRefs.current[i] = node }}
+                  type="color"
+                  value={color}
+                  className="palette-color-input-hidden"
+                  onPointerDown={e => e.stopPropagation()}
+                  onChange={e => { setActiveIdx(i); changeColor(i, e.target.value) }}
+                />
+              </div>
               <span
                 className={`palette-hex${copiedIdx === i ? ' copied' : ''}`}
                 onClick={e => {
@@ -84,27 +75,6 @@ export default function PaletteObject({ el, selected, editing, onUpdate, onResiz
           )
         })}
       </div>
-
-      {pickerOpen && (
-        <div
-          ref={pickerRef}
-          className="palette-picker-popover"
-          onPointerDown={e => e.stopPropagation()}
-        >
-          <HexColorPicker color={colors[idx]} onChange={changeColor} />
-          <div className="palette-picker-hex">
-            <span className="palette-picker-hex-label">{colors[idx].toUpperCase()}</span>
-            <div style={{ display: 'flex', gap: 6 }}>
-              {hasEyeDropper && (
-                <button className="palette-picker-eyedropper" onPointerDown={e => e.stopPropagation()} onClick={pickFromScreen}>
-                  🩸
-                </button>
-              )}
-              <button className="palette-picker-done" onPointerDown={e => e.stopPropagation()} onClick={() => setPickerOpen(false)}>Done</button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {selected && (
         <ResizeHandle w={size} h={null} onResize={nw => onResize(nw, null)} minW={50} scaleRef={scaleRef} />
