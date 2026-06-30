@@ -26,13 +26,12 @@ const CREATE_RIGHT = [
  *
  * key={selectedId || 'create'} in the parent resets panel state on selection change.
  */
-export default function BoardToolbar({ selectedEl, selectedType, onAction, clipboardKey: _ck, ...actions }) {
+export default function BoardToolbar({ selectedEl, selectedType, onAction, hasClipboard, ...actions }) {
   const [panel, setPanel]         = useState(null)
   const [panelText, setPanelText] = useState('')
 
   // ── No selection → creation toolbar ────────────────────────────────────────
   if (!selectedEl) {
-    const hasClipboard = !!sessionStorage.getItem('refmemo_clipboard')
     return (
       <div className="bottom-bar board-bottom" onPointerDown={e => e.stopPropagation()}>
         <div className="bottom-nav">

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState } from 'react'
 import ResizeHandle from '../ResizeHandle'
 
 // Backward compat: old `color` type used { color: '#hex' }
@@ -19,22 +19,13 @@ function isLightColor(hex) {
 
 const SWATCH_SIZE = 90
 
-export default function PaletteObject({ el, selected, onUpdate, onResize, scaleRef, onRegisterPicker }) {
+export default function PaletteObject({ el, selected, onUpdate, onResize, scaleRef }) {
   const colors = getPaletteColors(el.content)
   const [activeIdx, setActiveIdx] = useState(0)
   const [copiedIdx, setCopiedIdx] = useState(null)
   const idx = Math.min(activeIdx, colors.length - 1)
-  const inputRefs = useRef({})
-  const activeIdxRef = useRef(idx)
-  activeIdxRef.current = idx
   const size = el.w || SWATCH_SIZE
   const w = size * colors.length + 6 * (colors.length - 1)
-
-  // Register once — the function always reads the current active swatch via ref.
-  useEffect(() => {
-    onRegisterPicker?.(() => inputRefs.current[activeIdxRef.current]?.click())
-    return () => onRegisterPicker?.(null)
-  }, [])
 
   function changeColor(i, hex) {
     onUpdate({ ...el.content, colors: colors.map((c, ci) => ci === i ? hex : c) })
@@ -54,10 +45,10 @@ export default function PaletteObject({ el, selected, onUpdate, onResize, scaleR
               >
                 {/* Native OS color picker — always in DOM so trigger can .click() it synchronously */}
                 <input
-                  ref={node => { inputRefs.current[i] = node }}
                   type="color"
                   value={color}
                   className="palette-color-input-hidden"
+                  style={{ pointerEvents: selected ? 'auto' : 'none' }}
                   onPointerDown={e => e.stopPropagation()}
                   onChange={e => { setActiveIdx(i); changeColor(i, e.target.value) }}
                 />
