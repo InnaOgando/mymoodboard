@@ -41,21 +41,16 @@ export default function PaletteObject({ el, selected, onUpdate, onResize, scaleR
               <div
                 className={`palette-swatch-sq ${light ? 'palette-swatch-sq--light' : ''} ${i === idx ? 'active' : ''}`}
                 style={{ background: color, width: size, height: size }}
-                onClick={() => { console.log(`[palette] swatch-div[${i}] onClick (setActiveIdx)`); setActiveIdx(i) }}
+                onClick={() => setActiveIdx(i)}
               >
                 {/* Native OS color picker — always in DOM so trigger can .click() it synchronously */}
                 <input
-                  ref={el => { inputRefs.current[i] = el }}
                   type="color"
                   value={color}
                   className="palette-color-input-hidden"
                   style={{ pointerEvents: selected ? 'auto' : 'none' }}
-                  onPointerDown={e => console.log(`[palette] input[${i}] pointerdown — isPrimary:${e.isPrimary} type:${e.pointerType} target:${e.target.tagName}`)}
-                  onPointerUp={e => console.log(`[palette] input[${i}] pointerup   — isPrimary:${e.isPrimary} type:${e.pointerType}`)}
-                  onClick={e => console.log(`[palette] input[${i}] click        — isTrusted:${e.isTrusted}`)}
-                  onFocus={e => console.log(`[palette] input[${i}] focus`)}
-                  onBlur={e => console.log(`[palette] input[${i}] blur`)}
-                  onChange={e => { console.log(`[palette] input[${i}] onChange → ${e.target.value}`); setActiveIdx(i); changeColor(i, e.target.value) }}
+                  onClick={() => console.log('[palette] input click')}
+                  onChange={e => { console.log('[palette] input change →', e.target.value); setActiveIdx(i); changeColor(i, e.target.value) }}
                 />
               </div>
               <span

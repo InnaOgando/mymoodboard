@@ -1247,6 +1247,7 @@ body {
   border: none;
   padding: 0;
   cursor: pointer;
+  touch-action: auto;
 }
 .palette-hex {
   font-family: 'Courier New', monospace;
