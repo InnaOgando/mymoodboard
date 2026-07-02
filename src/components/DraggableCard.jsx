@@ -12,6 +12,7 @@ export default function DraggableCard({
   const startPos = useRef({ x: 0, y: 0 })
   const lastPos = useRef({ x, y })
   const moved = useRef(false)
+  const interactiveDown = useRef(false) // pointer sequence began on an embedded field
   const ref = useRef()
   const longTimer = useRef(null)
   const savedPointerId = useRef(null)
@@ -49,7 +50,11 @@ export default function DraggableCard({
 
     const isHandle = e.target.closest('.drag-handle')
     const isInteractive = INTERACTIVE.has(e.target.tagName) && !isHandle
-    if (isInteractive) return
+    if (isInteractive) {
+      interactiveDown.current = true
+      return  // field owns this pointer sequence — no drag, no long-press, no card tap
+    }
+    interactiveDown.current = false
     e.stopPropagation()
 
     moved.current = false
@@ -111,6 +116,14 @@ export default function DraggableCard({
     cancelLong()
     ref.current?.classList.remove('lifted')
 
+    // Pointer sequence began on an interactive descendant — the field owns it.
+    // Never interpret as a card tap or double-tap.
+    if (interactiveDown.current) {
+      interactiveDown.current = false
+      isDragging.current = false
+      return
+    }
+
     if (moved.current && isDragging.current) {
       onDragEnd?.(lastPos.current.x, lastPos.current.y)
     } else if (!moved.current) {
@@ -143,6 +156,7 @@ export default function DraggableCard({
         ref.current?.classList.remove('lifted')
         isDragging.current = false
         moved.current = false
+        interactiveDown.current = false
       }}
     >
       {children}

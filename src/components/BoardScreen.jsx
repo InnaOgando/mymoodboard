@@ -596,7 +596,10 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
               const type = normalizeType(el.type)
               if (type === 'image') setPreviewEl(el)
               else if (type === 'collection') setGalleryEl(el)
-              else if (type === 'palette') setSelectedId(el.id)
+              else if (type === 'palette') {
+                console.log('[palette] onDoubleTap fired — calling setSelectedId')
+                setSelectedId(el.id)
+              }
               else if (type === 'link') {
                 let url = el.content?.url?.trim()
                 if (url) {

@@ -88,7 +88,8 @@ export const TOOLBAR_CONFIG = {
   ],
 
   idea: [
-    { id: 'bgColor',  label: 'Color',
+    { id: 'edit',    label: 'Edit',  icon: '✏', action: 'onEdit', visible: el => !el.locked },
+    { id: 'bgColor', label: 'Color',
       iconStyle: el => ({
         width: 18, height: 18, borderRadius: 4, display: 'inline-block',
         background: el?.content?.bgColor || '#fff',
