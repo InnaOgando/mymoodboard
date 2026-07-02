@@ -67,7 +67,6 @@ export default function TodoObject({ el, selected, editing, onUpdate, onResize, 
               style={{ pointerEvents: editing ? 'auto' : 'none' }}
               onChange={e => updateItem(i, e.target.value)}
               onKeyDown={e => handleKeyDown(e, i)}
-              onPointerDown={e => editing && e.stopPropagation()}
               placeholder="Task…"
             />
           </div>

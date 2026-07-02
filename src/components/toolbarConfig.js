@@ -69,16 +69,13 @@ export const PANEL_DEFS = {
 
 const LOCK   = { id: 'lock',   label: el => el.locked ? 'Locked' : 'Lock', icon: el => el.locked ? '🔒' : '🔓', action: 'onLock',      active:  el => !!el.locked }
 const GROUP  = { id: 'group',  label: 'Group',  icon: '⊞', action: 'onGroup',     visible: el => !el.locked }
-const COPY   = { id: 'copy',   label: 'Copy',   icon: '⊡', action: 'onCopy' }
-const CUT    = { id: 'cut',    label: 'Cut',    icon: '✂', action: 'onCut',       visible: el => !el.locked }
 const DUP    = { id: 'dup',    label: 'Dup',    icon: '⧉', action: 'onDuplicate' }
 const DELETE = { id: 'delete', label: 'Delete', icon: '×', action: 'onDelete',    danger:  true, visible: el => !el.locked }
 
 const SEP    = { id: '__sep__', sep: true }
 
 // Common trailing actions for all non-collection types.
-// Types that have a leading type-specific action prepend a separator themselves.
-const COMMON = [LOCK, GROUP, COPY, CUT, DUP, DELETE]
+const COMMON = [LOCK, GROUP, DUP, DELETE]
 
 // ── Toolbar configuration per object type ─────────────────────────────────────
 

@@ -26,7 +26,7 @@ const CREATE_RIGHT = [
  *
  * key={selectedId || 'create'} in the parent resets panel state on selection change.
  */
-export default function BoardToolbar({ selectedEl, selectedType, onAction, hasClipboard, ...actions }) {
+export default function BoardToolbar({ selectedEl, selectedType, onAction, ...actions }) {
   const [panel, setPanel]         = useState(null)
   const [panelText, setPanelText] = useState('')
 
@@ -51,12 +51,6 @@ export default function BoardToolbar({ selectedEl, selectedType, onAction, hasCl
               <span className="nav-label">{item.label}</span>
             </button>
           ))}
-          {hasClipboard && (
-            <button key="paste" className="nav-btn" onClick={() => actions.onPaste?.()}>
-              <span className="ft-icon">⧉</span>
-              <span className="nav-label">Paste</span>
-            </button>
-          )}
         </div>
       </div>
     )

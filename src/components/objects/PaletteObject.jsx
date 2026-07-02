@@ -49,7 +49,6 @@ export default function PaletteObject({ el, selected, onUpdate, onResize, scaleR
                   value={color}
                   className="palette-color-input-hidden"
                   style={{ pointerEvents: selected ? 'auto' : 'none' }}
-                  onPointerDown={e => e.stopPropagation()}
                   onChange={e => { setActiveIdx(i); changeColor(i, e.target.value) }}
                 />
               </div>

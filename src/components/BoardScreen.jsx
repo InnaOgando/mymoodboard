@@ -65,7 +65,12 @@ function findFreePosition(existingElements, childBoards, viewportBounds, objW = 
   // Viewport full — place just below the lowest box already on screen,
   // not a full viewport away, so the new object stays beside current work.
   const lowestBottom = allBoxes.reduce((max, o) => Math.max(max, o.y + o.h), startY)
-  return { x: Math.round(startX), y: Math.round(lowestBottom + GAP) }
+  const fallbackPos = { x: Math.round(startX), y: Math.round(lowestBottom + GAP) }
+  console.warn('[placement] findFreePosition FALLBACK — viewport full.',
+    'startY=' + Math.round(startY), 'endY=' + Math.round(endY),
+    'lowestBottom=' + Math.round(lowestBottom),
+    '→', JSON.stringify(fallbackPos))
+  return fallbackPos
 }
 
 export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, onHome }) {
@@ -74,7 +79,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
   const [childBoards, setChildBoards] = useState([])
   const [selectedId, setSelectedId] = useState(null)
   const [editingId, setEditingId] = useState(null)
-  const [hasClipboard, setHasClipboard] = useState(false)
+
   const [showImagePicker, setShowImagePicker] = useState(false)
   const [dropOverCollectionId, _setDropOverCollectionId] = useState(null)
   const [undoStack, setUndoStack] = useState([])
@@ -110,29 +115,56 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
     return makeViewportBounds(canvasContainerRef, canvasOffsetRef, scaleRef)
   }
 
+  // Logs full placement trace and whether the element lands inside the visible screen.
+  function logPlacement(source, vp, pos, el) {
+    const offset = { ...canvasOffsetRef.current }
+    const scale  = scaleRef.current
+    const container = canvasContainerRef.current
+    const cw = container?.clientWidth  ?? 0
+    const ch = container?.clientHeight ?? 0
+
+    // Canvas-to-screen transform: screenX = canvasX * scale + offsetX
+    const screenX = el.x * scale + offset.x
+    const screenY = el.y * scale + offset.y
+    const screenX2 = screenX + (el.w || 150) * scale
+    const screenY2 = screenY + (el.h || 150) * scale
+
+    const inViewport = screenX2 > 0 && screenX < cw && screenY2 > 0 && screenY < ch
+    const dx = inViewport ? 0 : Math.max(0 - screenX2, screenX - cw, 0)
+    const dy = inViewport ? 0 : Math.max(0 - screenY2, screenY - ch, 0)
+
+    console.group(`[placement] ${source}`)
+    console.log('canvas state  | offset:', JSON.stringify(offset), '| scale:', scale, '| containerOk:', !!container, `(${cw}×${ch})`)
+    console.log('viewport      |', JSON.stringify(vp))
+    console.log('findFree →    |', JSON.stringify(pos))
+    console.log('stored el     | x:', el.x, 'y:', el.y, '| el matches pos:', el.x === pos.x && el.y === pos.y)
+    console.log('screen pos    | top-left:', `(${Math.round(screenX)}, ${Math.round(screenY)})`, '→ bottom-right:', `(${Math.round(screenX2)}, ${Math.round(screenY2)})`)
+    console.log('in viewport   |', inViewport, inViewport ? '' : `| dx=${Math.round(dx)} dy=${Math.round(dy)} px outside`)
+    console.groupEnd()
+  }
+
+  // Shared helper — the single image-from-blob placement path.
+  // Captures viewport BEFORE any async work so pan/zoom during upload is irrelevant.
+  async function addImageFromBlob(blob, source = 'unknown') {
+    const vp  = getViewport()
+    const pos = findFreePosition(elementsRef.current, childBoardsRef.current, vp, 150, 150)
+    try {
+      const meta = await processAndUpload(blob)
+      const el = await addElement('image', pos, meta)
+      if (el) logPlacement(source, vp, pos, el)
+    } catch (err) {
+      console.warn('[placement] addImageFromBlob processAndUpload failed:', err)
+    }
+  }
+
   // Desktop paste (Cmd+V)
   useEffect(() => {
     async function handlePaste(e) {
       const items = Array.from(e.clipboardData?.items || [])
       const imgItem = items.find(i => i.type.startsWith('image/'))
-      if (!imgItem) {
-        // No image on the system clipboard — fall back to the object clipboard
-        // (Copy action) so Cmd+V completes the Copy → Paste workflow.
-        if (sessionStorage.getItem('refmemo_clipboard')) {
-          e.preventDefault()
-          pasteElement()
-        }
-        return
-      }
+      if (!imgItem) return
       e.preventDefault()
-      const blob = imgItem.getAsFile()
-      try {
-        const meta = await processAndUpload(blob)
-        const pos = findFreePosition(elementsRef.current, childBoardsRef.current, getViewport(), 160, 200)
-        await addElement('image', pos, meta)
-      } catch (err) {
-        console.warn('[paste] processAndUpload failed:', err)
-      }
+      await addImageFromBlob(imgItem.getAsFile(), 'cmd-v')
     }
     document.addEventListener('paste', handlePaste)
     return () => document.removeEventListener('paste', handlePaste)
@@ -294,39 +326,9 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
     setElements(prev => [...prev, dup])
     setSelectedId(dup.id)
     saveElement(dup).catch(e => console.error('[duplicate]', e))
+    logPlacement('duplicate', vp, pos, dup)
   }
 
-  function copyElement(el) {
-    const { id: _id, boardId: _bid, ...rest } = el
-    sessionStorage.setItem('refmemo_clipboard', JSON.stringify(rest))
-    setHasClipboard(true)
-  }
-
-  function cutElement(el) {
-    copyElement(el)
-    removeElement(el.id)
-    setSelectedId(null)
-  }
-
-  async function pasteElement() {
-    const json = sessionStorage.getItem('refmemo_clipboard')
-    if (!json) return
-    try {
-      const template = JSON.parse(json)
-      const vp = getViewport()
-      const w = template.w || 150
-      const h = template.h || 150
-      const pos = findFreePosition(elementsRef.current, childBoardsRef.current, vp, w, h)
-      const el = { ...template, id: uid(), boardId, x: pos.x, y: pos.y, createdAt: Date.now() }
-      elementsRef.current = [...elementsRef.current, el]
-      setElements(prev => [...prev, el])
-      setSelectedId(el.id)
-      saveElement(el).catch(e => console.error('[paste]', e))
-      // Clear clipboard so the Paste button disappears immediately after use
-      sessionStorage.removeItem('refmemo_clipboard')
-      setHasClipboard(false)
-    } catch (e) { console.error('[paste] failed', e) }
-  }
 
   function setElementCaption(id, caption) {
     const el = elementsRef.current.find(e => e.id === id)
@@ -460,17 +462,19 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
   async function handleFiles(files) {
     const imgs = Array.from(files).filter(f => f.type.startsWith('image/'))
     const docs = Array.from(files).filter(f => f.type === 'application/pdf' || f.name.match(/\.(doc|docx)$/i))
+    console.log('[placement] handleFiles imgs=' + imgs.length + ' docs=' + docs.length)
     const vp = getViewport()
 
     // addElement updates elementsRef.current synchronously, so each iteration
     // sees the previously placed image and avoids overlap automatically.
     for (const img of imgs) {
-      const pos = findFreePosition(elementsRef.current, childBoardsRef.current, vp, 160, 200)
+      const pos = findFreePosition(elementsRef.current, childBoardsRef.current, vp, 150, 150)
       try {
         const meta = await processAndUpload(img)
-        await addElement('image', pos, meta)
+        const el = await addElement('image', pos, meta)
+        if (el) logPlacement('Photos/file-picker', vp, pos, el)
       } catch (err) {
-        console.warn('[handleFiles] processAndUpload failed:', err)
+        console.warn('[placement] handleFiles processAndUpload failed:', err)
       }
     }
     for (const f of docs) {
@@ -480,13 +484,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
   }
 
   async function pasteFromClipboard() {
-    const vp = getViewport()
-    const internal = sessionStorage.getItem('refmemo_copied_image')
-    if (internal) {
-      const pos = findFreePosition(elementsRef.current, childBoardsRef.current, vp, 160, 200)
-      addElement('image', pos, { src: internal })
-      return
-    }
+    console.log('[placement] pasteFromClipboard triggered')
     if (location.protocol === 'https:' && navigator.clipboard?.read) {
       try {
         const items = await navigator.clipboard.read()
@@ -494,22 +492,19 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
           const imageType = item.types.find(t => t.startsWith('image/'))
           if (imageType) {
             const blob = await item.getType(imageType)
-            try {
-              const meta = await processAndUpload(blob)
-              const pos = findFreePosition(elementsRef.current, childBoardsRef.current, vp, 160, 200)
-              await addElement('image', pos, meta)
-            } catch (err) {
-              console.warn('[pasteFromClipboard] processAndUpload failed:', err)
-            }
+            await addImageFromBlob(blob, 'screenshot-btn')
             return
           }
         }
+        console.log('[placement] pasteFromClipboard → no image in clipboard, opening file picker')
         fileRef.current.click()
-      } catch {
+      } catch (err) {
+        console.log('[placement] pasteFromClipboard → clipboard.read failed:', err?.name, '→ file picker')
         fileRef.current.click()
       }
       return
     }
+    console.log('[placement] pasteFromClipboard → no clipboard API, opening file picker')
     fileRef.current.click()
   }
 
@@ -641,15 +636,11 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
             key={selectedId || 'create'}
             selectedEl={selEl}
             selectedType={selType}
-            hasClipboard={hasClipboard}
             onAction={handleNavAction}
             onDelete={() => removeElement(selectedId)}
             onLock={() => toggleLock(selectedId)}
             onGroup={() => { if (selEl) makeCollection(selEl) }}
-            onCopy={() => { if (selEl) copyElement(selEl) }}
-            onCut={() => { if (selEl) cutElement(selEl) }}
             onDuplicate={() => { if (selEl) duplicateElement(selEl) }}
-            onPaste={pasteElement}
             onCaption={caption => setElementCaption(selectedId, caption)}
             onBgColor={color => setElementBgColor(selectedId, color)}
             onAddTitle={title => setTodoTitle(selectedId, title)}

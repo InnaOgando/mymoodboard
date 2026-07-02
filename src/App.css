@@ -491,6 +491,22 @@ body {
   word-break: break-word;
   padding-right: 16px;
 }
+/*
+ * Restore native browser text-editing behaviour inside draggable cards.
+ * .draggable-card sets user-select:none and touch-action:none for drag support,
+ * but those must be overridden for every editable field so that iOS and Android
+ * can show their native copy/cut/paste/selection context menus.
+ * touch-action:auto lets the OS recognise long-press for text selection handles.
+ * user-select:text lets the OS select and copy text inside the field.
+ */
+.card-textarea,
+.card-input,
+.todo-input {
+  touch-action: auto;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
 .card-textarea {
   width: 100%;
   background: transparent;
