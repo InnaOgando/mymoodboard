@@ -194,7 +194,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
     // (the useEffect that mirrors state→ref only runs after the next render)
     elementsRef.current = [...elementsRef.current, el]
     setElements(prev => [...prev, el])
-    const editableTypes = ['idea', 'text', 'note', 'link', 'todo', 'palette']
+    const editableTypes = ['idea', 'text', 'note', 'link', 'todo']
     if (editableTypes.includes(type)) setEditingId(el.id)
     saveElement(el, { skipRemote }).catch(e => console.error('[addElement] saveElement failed:', e))
     return el
@@ -597,7 +597,6 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
               if (type === 'image') setPreviewEl(el)
               else if (type === 'collection') setGalleryEl(el)
               else if (type === 'palette') {
-                console.log('[palette] onDoubleTap fired — calling setSelectedId')
                 setSelectedId(el.id)
               }
               else if (type === 'link') {

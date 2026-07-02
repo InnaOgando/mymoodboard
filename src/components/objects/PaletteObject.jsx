@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import ResizeHandle from '../ResizeHandle'
 
 // Backward compat: old `color` type used { color: '#hex' }
@@ -23,6 +23,9 @@ export default function PaletteObject({ el, selected, onUpdate, onResize, scaleR
   const colors = getPaletteColors(el.content)
   const [activeIdx, setActiveIdx] = useState(0)
   const [copiedIdx, setCopiedIdx] = useState(null)
+  // Capture selection state at touch-start so the synthesised click cannot open
+  // the picker if React re-rendered (selected→true) before the click fires.
+  const selectedAtTouchStart = useRef(false)
   const idx = Math.min(activeIdx, colors.length - 1)
   const size = el.w || SWATCH_SIZE
   const w = size * colors.length + 6 * (colors.length - 1)
@@ -41,16 +44,16 @@ export default function PaletteObject({ el, selected, onUpdate, onResize, scaleR
               <div
                 className={`palette-swatch-sq ${light ? 'palette-swatch-sq--light' : ''} ${i === idx ? 'active' : ''}`}
                 style={{ background: color, width: size, height: size }}
+                onPointerDown={() => { selectedAtTouchStart.current = selected }}
                 onClick={() => setActiveIdx(i)}
               >
-                {/* Native OS color picker — always in DOM so trigger can .click() it synchronously */}
                 <input
                   type="color"
                   value={color}
                   className="palette-color-input-hidden"
                   style={{ pointerEvents: selected ? 'auto' : 'none' }}
-                  onClick={() => console.log('[palette] input click')}
-                  onChange={e => { console.log('[palette] input change →', e.target.value); setActiveIdx(i); changeColor(i, e.target.value) }}
+                  onClick={e => { if (!selectedAtTouchStart.current) { e.preventDefault(); return } setActiveIdx(i) }}
+                  onChange={e => { setActiveIdx(i); changeColor(i, e.target.value) }}
                 />
               </div>
               <span
