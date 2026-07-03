@@ -1539,11 +1539,16 @@ body {
 
 /* ── Image caption (Task 7) ── */
 .image-caption {
+  display: inline-block;
+  margin-top: 6px;
+  background: #fff;
+  color: #333;
   font-size: 0.85rem;
-  color: var(--muted);
-  padding: 6px 4px 2px;
+  padding: 5px 12px;
+  border-radius: 8px;
   line-height: 1.4;
   word-break: break-word;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.10);
 }
 
 /* ── Image Preview / Collection Gallery (Tasks 8 & 9) ── */
