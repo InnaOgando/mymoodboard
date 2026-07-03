@@ -1005,8 +1005,8 @@ body {
 
 .collection-items {
   display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: flex-start;
   gap: 6px;
   padding: 10px;
   background: #fff;
@@ -1027,15 +1027,13 @@ body {
 
 .collection-item-wrap {
   position: relative;
-  /* Images are flex: none at their stored width.
-     Text items (idea/link/todo) stretch to fill the row. */
-  flex: none;
 }
 .collection-item-wrap--text {
-  flex: 1 1 100%;
+  width: 100%;
   min-width: 0;
 }
 .collection-item-wrap img {
+  max-width: 100%;
   height: auto;
   display: block;
   pointer-events: none;
@@ -1346,7 +1344,7 @@ body {
 .mini-swatch {
   width: 22px;
   height: 22px;
-  border-radius: 50%;
+  border-radius: 3px;
   box-shadow: 0 1px 3px rgba(0,0,0,0.2);
 }
 .mini-todo {

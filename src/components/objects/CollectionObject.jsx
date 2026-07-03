@@ -1,6 +1,8 @@
+import { useRef } from 'react'
 import ResizeHandle from '../ResizeHandle'
 import CachedImage from './CachedImage'
 import { getPaletteColors } from './PaletteObject'
+import { openUrl } from '../../utils.js'
 
 function normalizeType(type) {
   if (type === 'text' || type === 'note') return 'idea'
@@ -24,9 +26,13 @@ function shortUrl(url) {
   } catch { return url.slice(0, 24) + '…' }
 }
 
+const DOUBLE_TAP_MS = 420
+
 // Full-fidelity preview — objects display at their natural size inside the collection
 function CollectionItem({ item }) {
   const type = normalizeType(item.type)
+  const lastTapRef = useRef(0)
+
   switch (type) {
     case 'image':
       return (
@@ -44,18 +50,29 @@ function CollectionItem({ item }) {
           <span className="mini-idea-text">{item.content.text || '(empty)'}</span>
         </div>
       )
-    case 'link':
+    case 'link': {
+      const url = item.content.url?.trim()
+      function handleLinkPointerDown(e) {
+        const now = Date.now()
+        if (now - lastTapRef.current < DOUBLE_TAP_MS) {
+          // Second tap within threshold — open URL and prevent collection double-tap
+          e.stopPropagation()
+          openUrl(url)
+        }
+        lastTapRef.current = now
+      }
       return (
-        <div className="mini-link">
-          <div className="mini-link-title">{item.content.title || shortUrl(item.content.url || '') || 'Link'}</div>
-          {item.content.url && (
-            <a className="mini-link-url" href={item.content.url} target="_blank" rel="noreferrer"
+        <div className="mini-link" onPointerDown={handleLinkPointerDown}>
+          <div className="mini-link-title">{item.content.title || shortUrl(url || '') || 'Link'}</div>
+          {url && (
+            <a className="mini-link-url" href={url} target="_blank" rel="noreferrer"
               onPointerDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
-              {shortUrl(item.content.url)}
+              {shortUrl(url)}
             </a>
           )}
         </div>
       )
+    }
     case 'palette':
       return (
         <div className="mini-palette">

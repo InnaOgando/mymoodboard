@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { uid } from '../utils.js'
+import { uid, openUrl } from '../utils.js'
 import { getBoard, getBoards, saveBoard, deleteBoard, getElements, saveElement, deleteElement, exportAllData, importAllData } from '../db'
 import Canvas from './Canvas'
 import DraggableCard from './DraggableCard'
@@ -621,13 +621,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
                 setSelectedId(el.id)
               }
               else if (type === 'link') {
-                let url = el.content?.url?.trim()
-                if (url) {
-                  if (!/^https?:\/\//i.test(url)) url = 'https://' + url
-                  const a = document.createElement('a')
-                  a.href = url; a.target = '_blank'; a.rel = 'noreferrer noopener'
-                  document.body.appendChild(a); a.click(); document.body.removeChild(a)
-                }
+                openUrl(el.content?.url?.trim())
               }
               else if (['idea', 'text', 'note', 'todo'].includes(type)) setEditingId(el.id)
             }}
