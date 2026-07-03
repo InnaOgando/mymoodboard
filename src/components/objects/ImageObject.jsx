@@ -9,12 +9,6 @@ export default function ImageObject({ el, selected, onResize, scaleRef }) {
     <div style={{ position: 'relative', width: w }}>
       <div ref={ref} className={`el-card el-image ${selected ? 'selected' : ''}`}
         style={{ width: w, position: 'relative', minHeight: 60 }}>
-        {el.content.caption && (
-          <div className="drag-handle">
-            <span className="handle-dots">⠿</span>
-            <span className="image-caption-label">{el.content.caption}</span>
-          </div>
-        )}
         {!loaded && (
           <div style={{ width: '100%', minHeight: 80, background: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div style={{ width: 20, height: 20, border: '2px solid #ccc', borderTopColor: '#888', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
@@ -30,6 +24,9 @@ export default function ImageObject({ el, selected, onResize, scaleRef }) {
         )}
         {selected && <ResizeHandle w={w} h={null} onResize={nw => onResize(nw, null)} minW={60} scaleRef={scaleRef} />}
       </div>
+      {el.content.caption && (
+        <div className="image-caption">{el.content.caption}</div>
+      )}
     </div>
   )
 }

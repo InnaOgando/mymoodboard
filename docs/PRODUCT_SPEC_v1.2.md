@@ -136,7 +136,7 @@ Imported images:
 
 # 5. Collections
 
-Collections are visual groups.
+Collections are visual groups. They are immediately distinguishable from individual objects even when containing a single item.
 
 They are not:
 
@@ -151,6 +151,22 @@ Collections never modify:
 - Object appearance
 - Object aspect ratio
 - Object functionality
+
+## Visual Identity
+
+Collection appearance:
+
+- White card with subtle 1px light-gray border.
+- Shadow slightly stronger than image objects.
+- Dedicated header area with a thin divider below it.
+- Header contains a small 12×12 px neutral gray rounded-square icon and a centered bold title.
+- Comfortable padding around contents.
+- No card count. No "Collection" label. No colored badges.
+
+Image objects remain visually simpler:
+
+- No outer container distinct from the image itself.
+- Caption displayed as a header row at the top of the card when present.
 
 ## Create
 

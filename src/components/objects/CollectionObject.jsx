@@ -92,12 +92,12 @@ export default function CollectionObject({
     <div style={{ position: 'relative', width: w, paddingBottom: selected ? 12 : 0 }}>
 
       <div
-        className={`el-card el-collection ${selected ? 'selected' : ''} ${isDropTarget ? 'drop-target' : ''}`}
+        className={`el-collection ${selected ? 'selected' : ''} ${isDropTarget ? 'drop-target' : ''}`}
         style={{ width: w, borderColor: accentColor || undefined }}
       >
-        <div className="drag-handle" style={{ background: accentColor ? `${accentColor}1a` : undefined }}>
-          <span className="handle-dots">⠿</span>
-          <span className="column-label">{label}</span>
+        <div className="col-header drag-handle" style={{ background: accentColor ? `${accentColor}1a` : undefined }}>
+          <span className="col-header-icon" />
+          <span className="col-header-title">{label}</span>
         </div>
 
         {items.length === 0 ? (
