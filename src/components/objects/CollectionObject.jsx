@@ -65,22 +65,26 @@ function CollectionItem({ item }) {
         <div className="mini-link" onPointerDown={handleLinkPointerDown}>
           <div className="mini-link-title">{item.content.title || shortUrl(url || '') || 'Link'}</div>
           {url && (
-            <a className="mini-link-url" href={url} target="_blank" rel="noreferrer"
-              onPointerDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
+            <span className="mini-link-url" onPointerDown={e => e.stopPropagation()}>
               {shortUrl(url)}
-            </a>
+            </span>
           )}
         </div>
       )
     }
-    case 'palette':
+    case 'palette': {
+      const swatchSize = item.w || 90
       return (
         <div className="mini-palette">
           {getPaletteColors(item.content).map((c, i) => (
-            <div key={i} className="mini-swatch" style={{ background: c }} />
+            <div key={i} className="palette-swatch-wrap">
+              <div className="mini-swatch" style={{ background: c, width: swatchSize, height: swatchSize }} />
+              <span className="palette-hex">{c.toUpperCase()}</span>
+            </div>
           ))}
         </div>
       )
+    }
     case 'todo':
       return (
         <div className="mini-todo">

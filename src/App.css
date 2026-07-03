@@ -1342,10 +1342,11 @@ body {
   flex-wrap: wrap;
 }
 .mini-swatch {
-  width: 22px;
-  height: 22px;
-  border-radius: 3px;
+  border-radius: 10px;
   box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.mini-palette .palette-hex {
+  font-size: 0.78rem;
 }
 .mini-todo {
   padding: 6px 10px;
