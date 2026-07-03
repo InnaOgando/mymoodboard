@@ -50,6 +50,7 @@ export default function IdeaObject({ el, selected, editing, onUpdate, onResize, 
   const w = el.w || 220
   const h = el.h || 120
   const text = el.content.text || ''
+  const title = el.content.title || ''
   const bgColor = el.content.bgColor || null
   const [speechMsg, setSpeechMsg] = useState('')
   const { available: speechAvail, listening, interim, start, stop } = useSpeechRecognition()
@@ -82,7 +83,7 @@ export default function IdeaObject({ el, selected, editing, onUpdate, onResize, 
         style={{ width: w, height: h, background: bgColor || undefined }}>
         <div className="drag-handle">
           <span className="handle-dots">⠿</span>
-          <span className="idea-label">Idea</span>
+          <span className="idea-label">{title || 'Idea'}</span>
           {speechAvail && (
             <button
               className={`idea-mic-btn ${listening ? 'listening' : ''}`}
