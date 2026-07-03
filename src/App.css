@@ -1539,11 +1539,10 @@ body {
 
 /* ── Image caption (Task 7) ── */
 .image-caption {
-  font-size: 0.75rem;
+  font-size: 0.85rem;
   color: var(--muted);
-  text-align: center;
-  padding: 4px 6px 2px;
-  line-height: 1.3;
+  padding: 6px 4px 2px;
+  line-height: 1.4;
   word-break: break-word;
 }
 
