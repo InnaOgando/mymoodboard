@@ -95,6 +95,9 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
 
   const undoTimer = useRef(null)
   const scaleRef = useRef(1)
+  // Collection heights measured from DOM once at drag-start; cleared at drag-end.
+  // Avoids repeated DOM queries during continuous pointermove.
+  const collectionHeightsCache = useRef({})
   // Exposed to Canvas so we can compute viewport bounds for placement
   const canvasContainerRef = useRef()
   const canvasOffsetRef = useRef({ x: 40, y: 40 })
@@ -390,36 +393,50 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
 
   // ── Drag & Drop (canvas ↔ collection) ──────────────────────────────────────
 
-  function hitTestCollection(cx, cy) {
+  function buildCollectionHeightsCache() {
+    const cache = {}
     const cols = elementsRef.current.filter(e => e.type === 'collection' || e.type === 'column')
     for (const col of cols) {
-      const items = getCollectionItems(col.content)
+      const domEl = document.querySelector(`[data-el-id="${col.id}"]`)
+      if (domEl) cache[col.id] = domEl.clientHeight
+    }
+    collectionHeightsCache.current = cache
+  }
+
+  function hitTestCollection(cx, cy) {
+    const MARGIN = 20
+    const cols = elementsRef.current.filter(e => e.type === 'collection' || e.type === 'column')
+    for (const col of cols) {
       const colW = col.w || 260
-      // Collection renders as a flex column. Heights vary by content type.
-      // Use a generous per-item estimate (images can be tall) plus header.
-      const HEADER = 44
-      const PER_ITEM = 180
-      const colH = HEADER + Math.max(1, items.length) * PER_ITEM
-      if (cx >= col.x && cx <= col.x + colW && cy >= col.y && cy <= col.y + colH) {
+      const colH = collectionHeightsCache.current[col.id] ?? 200
+      if (
+        cx >= col.x - MARGIN && cx <= col.x + colW + MARGIN &&
+        cy >= col.y - MARGIN && cy <= col.y + colH + MARGIN
+      ) {
         return col.id
       }
     }
     return null
   }
 
+  function handleObjectDragStart() {
+    buildCollectionHeightsCache()
+  }
+
   function handleObjectDragMove(objectEl, nx, ny) {
     if (normalizeType(objectEl.type) === 'collection') return
     const cx = nx + (objectEl.w || 150) / 2
-    const cy = ny + 80
+    const cy = ny + (objectEl.h || 150) / 2
     const colId = hitTestCollection(cx, cy)
     setDropOverCollectionId(colId !== objectEl.id ? colId : null)
   }
 
   async function handleObjectDragEnd(objectEl, nx, ny) {
+    collectionHeightsCache.current = {}
     setDropOverCollectionId(null)
     if (normalizeType(objectEl.type) === 'collection') return
     const cx = nx + (objectEl.w || 150) / 2
-    const cy = ny + 80
+    const cy = ny + (objectEl.h || 150) / 2
     const colId = hitTestCollection(cx, cy)
     if (!colId || colId === objectEl.id) return
     await dropIntoCollection(objectEl, colId)
@@ -572,10 +589,11 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
         ))}
 
         {elements.map(el => (
-          <DraggableCard key={el.id} x={el.x} y={el.y} scaleRef={scaleRef}
+          <DraggableCard key={el.id} elId={el.id} x={el.x} y={el.y} scaleRef={scaleRef}
             selected={selectedId === el.id}
             locked={!!el.locked}
             onMove={(x, y) => moveElement(el.id, x, y)}
+            onDragStart={() => handleObjectDragStart()}
             onDragMove={(nx, ny) => handleObjectDragMove(el, nx, ny)}
             onDragEnd={(nx, ny) => handleObjectDragEnd(el, nx, ny)}
             onTap={() => {

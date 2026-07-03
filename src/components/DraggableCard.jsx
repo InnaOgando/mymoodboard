@@ -4,8 +4,8 @@ const INTERACTIVE = new Set(['INPUT', 'TEXTAREA', 'SELECT', 'A'])
 const DOUBLE_TAP_MS = 420
 
 export default function DraggableCard({
-  x, y, scaleRef, onMove, onTap, onDoubleTap, onDragMove, onDragEnd,
-  children, selected, alwaysDraggable, locked,
+  x, y, scaleRef, onMove, onTap, onDoubleTap, onDragStart, onDragMove, onDragEnd,
+  children, selected, alwaysDraggable, locked, elId,
 }) {
   const isDragging = useRef(false)
   const startPointer = useRef({ x: 0, y: 0 })
@@ -74,6 +74,7 @@ export default function DraggableCard({
       isDragging.current = true
       startPos.current = { x, y }
       ref.current?.setPointerCapture(e.pointerId)
+      onDragStart?.()
     } else if (!isResizeHandle) {
       // Canvas objects always need long press before moving (spec §3)
       ref.current?.classList.add('long-pressing')
@@ -87,6 +88,7 @@ export default function DraggableCard({
         isDragging.current = true
         startPos.current = { x: capturedX, y: capturedY }
         try { ref.current?.setPointerCapture(capturedId) } catch {}
+        onDragStart?.()
       }, 400)
     }
   }
@@ -145,6 +147,7 @@ export default function DraggableCard({
       ref={ref}
       className={`draggable-card ${selected ? 'selected' : ''}`}
       style={{ left: x, top: y }}
+      data-el-id={elId}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
