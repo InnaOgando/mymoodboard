@@ -45,7 +45,7 @@ function CollectionItem({ item }) {
       )
     case 'idea':
       return (
-        <div className="mini-idea">
+        <div className="mini-idea" style={item.w ? { width: item.w } : undefined}>
           <span className="mini-idea-icon">💡</span>
           <span className="mini-idea-text">{item.content.text || '(empty)'}</span>
         </div>
@@ -55,14 +55,13 @@ function CollectionItem({ item }) {
       function handleLinkPointerDown(e) {
         const now = Date.now()
         if (now - lastTapRef.current < DOUBLE_TAP_MS) {
-          // Second tap within threshold — open URL and prevent collection double-tap
           e.stopPropagation()
           openUrl(url)
         }
         lastTapRef.current = now
       }
       return (
-        <div className="mini-link" onPointerDown={handleLinkPointerDown}>
+        <div className="mini-link" style={item.w ? { width: item.w } : undefined} onPointerDown={handleLinkPointerDown}>
           <div className="mini-link-title">{item.content.title || shortUrl(url || '') || 'Link'}</div>
           {url && (
             <span className="mini-link-url" onPointerDown={e => e.stopPropagation()}>
@@ -73,10 +72,12 @@ function CollectionItem({ item }) {
       )
     }
     case 'palette': {
+      const colors = getPaletteColors(item.content)
       const swatchSize = item.w || 90
+      const totalW = swatchSize * colors.length + 6 * (colors.length - 1)
       return (
-        <div className="mini-palette">
-          {getPaletteColors(item.content).map((c, i) => (
+        <div className="mini-palette" style={{ width: totalW }}>
+          {colors.map((c, i) => (
             <div key={i} className="palette-swatch-wrap">
               <div className="mini-swatch" style={{ background: c, width: swatchSize, height: swatchSize }} />
               <span className="palette-hex">{c.toUpperCase()}</span>
@@ -87,7 +88,7 @@ function CollectionItem({ item }) {
     }
     case 'todo':
       return (
-        <div className="mini-todo">
+        <div className="mini-todo" style={item.w ? { width: item.w } : undefined}>
           {(item.content.items || []).slice(0, 4).map((t, i) => (
             <div key={i} className="mini-todo-item">
               <span className="mini-todo-check">{t.done ? '☑' : '☐'}</span>
@@ -126,9 +127,8 @@ export default function CollectionObject({
         ) : (
           <div className="collection-items">
             {items.map(item => {
-              const isText = normalizeType(item.type) !== 'image'
               return (
-                <div key={item.id} className={`collection-item-wrap${isText ? ' collection-item-wrap--text' : ''}`}>
+                <div key={item.id} className="collection-item-wrap">
                   <CollectionItem item={item} />
                   {selected && (
                     <button

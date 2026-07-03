@@ -1028,10 +1028,6 @@ body {
 .collection-item-wrap {
   position: relative;
 }
-.collection-item-wrap--text {
-  width: 100%;
-  min-width: 0;
-}
 .collection-item-wrap img {
   max-width: 100%;
   height: auto;
