@@ -432,12 +432,15 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
   }
 
   async function handleObjectDragEnd(objectEl, nx, ny) {
-    collectionHeightsCache.current = {}
     setDropOverCollectionId(null)
-    if (normalizeType(objectEl.type) === 'collection') return
+    if (normalizeType(objectEl.type) === 'collection') {
+      collectionHeightsCache.current = {}
+      return
+    }
     const cx = nx + (objectEl.w || 150) / 2
     const cy = ny + (objectEl.h || 150) / 2
     const colId = hitTestCollection(cx, cy)
+    collectionHeightsCache.current = {}
     if (!colId || colId === objectEl.id) return
     await dropIntoCollection(objectEl, colId)
   }
