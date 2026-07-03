@@ -1537,18 +1537,20 @@ body {
   white-space: nowrap;
 }
 
-/* ── Image caption (Task 7) ── */
+/* ── Image caption — integrated card footer ── */
 .image-caption {
-  display: inline-block;
-  margin-top: 6px;
   background: #fff;
-  color: #333;
-  font-size: 0.85rem;
-  padding: 5px 12px;
-  border-radius: 8px;
-  line-height: 1.4;
-  word-break: break-word;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.10);
+  color: #222;
+  font-size: 0.8rem;
+  font-weight: 400;
+  padding: 7px 10px;
+  line-height: 1;
+  height: 32px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+  box-sizing: border-box;
 }
 
 /* ── Image Preview / Collection Gallery (Tasks 8 & 9) ── */

@@ -22,11 +22,11 @@ export default function ImageObject({ el, selected, onResize, scaleRef }) {
           <img src={placeholderSrc} alt="" draggable={false}
             style={{ width: '100%', height: 'auto', display: 'block' }} />
         )}
+        {el.content.caption && (
+          <div className="image-caption">{el.content.caption}</div>
+        )}
         {selected && <ResizeHandle w={w} h={null} onResize={nw => onResize(nw, null)} minW={60} scaleRef={scaleRef} />}
       </div>
-      {el.content.caption && (
-        <div className="image-caption">{el.content.caption}</div>
-      )}
     </div>
   )
 }
