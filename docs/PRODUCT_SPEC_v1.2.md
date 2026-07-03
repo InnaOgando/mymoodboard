@@ -278,6 +278,7 @@ Image:
 
 Idea:
 
+- Add title
 - Background color
 - Delete
 - Lock
