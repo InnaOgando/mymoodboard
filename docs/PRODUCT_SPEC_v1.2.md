@@ -266,35 +266,37 @@ Replace all object top menus.
 
 Display one contextual bottom toolbar when an object is selected.
 
+Collection:
+
+- Title
+- Delete
+- Lock
+- Duplicate
+
+
 Image:
 
-- Caption
+- Title
 - Delete
 - Lock
 - Group
-- Copy
-- Cut
 - Duplicate
 
 Idea:
 
-- Add title
+- title
 - Background color
 - Delete
 - Lock
 - Group
-- Copy
-- Cut
 - Duplicate
 
 Todo:
 
-- Add title
+- title
 - Delete
 - Lock
 - Group
-- Copy
-- Cut
 - Duplicate
 
 Palette:
@@ -302,8 +304,6 @@ Palette:
 - Delete
 - Lock
 - Group
-- Copy
-- Cut
 - Duplicate
 
 Link:
@@ -312,8 +312,6 @@ Link:
 - Delete
 - Lock
 - Group
-- Copy
-- Cut
 - Duplicate
 
 Document:
@@ -321,8 +319,6 @@ Document:
 - Delete
 - Lock
 - Group
-- Copy
-- Cut
 - Duplicate
 
 ---
