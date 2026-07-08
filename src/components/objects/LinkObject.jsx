@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import ResizeHandle from '../ResizeHandle'
+import linkIcon from '../../assets/link.png'
 
 function shortUrl(url) {
   try {
@@ -35,7 +36,7 @@ export default function LinkObject({ el, selected, editing, onUpdate, onStopEdit
               />
               <button className="paste-btn" onMouseDown={e => e.preventDefault()}
                 onClick={async () => { try { onUpdate({ ...el.content, url: await navigator.clipboard.readText() }) } catch {} }}>
-                <img src="/link.png" alt="paste" style={{ width: 18, height: 18, objectFit: 'contain' }} />
+                <img src={linkIcon} alt="paste" style={{ width: 18, height: 18, objectFit: 'contain' }} />
               </button>
             </div>
             <button className="btn-primary" style={{ marginTop: 8 }}
@@ -45,7 +46,7 @@ export default function LinkObject({ el, selected, editing, onUpdate, onStopEdit
           <div className="link-view">
             {url
               ? <span className="link-view-url">
-                  <img src="/link.png" alt="" style={{ width: 12, height: 12, objectFit: 'contain', marginRight: 4, verticalAlign: 'middle', opacity: 0.6 }} />
+                  <img src={linkIcon} alt="" style={{ width: 12, height: 12, objectFit: 'contain', marginRight: 4, verticalAlign: 'middle', opacity: 0.6 }} />
                   {shortUrl(url)}
                 </span>
               : <span className="link-view-url link-view-placeholder">Two taps to open URL</span>}

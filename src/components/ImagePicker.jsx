@@ -1,4 +1,5 @@
 import { useRef } from 'react'
+import imageIcon from '../assets/image.png'
 
 export default function ImagePicker({ onFiles, onClose }) {
   const fileRef = useRef()
@@ -17,7 +18,7 @@ export default function ImagePicker({ onFiles, onClose }) {
 
         <div className="image-picker-options">
           <button className="picker-option" onClick={() => fileRef.current.click()}>
-            <img src="/image.png" alt="Photos" style={{ width: 24, height: 24, objectFit: 'contain' }} />
+            <img src={imageIcon} alt="Photos" style={{ width: 24, height: 24, objectFit: 'contain' }} />
             <span>Photos / Camera</span>
           </button>
         </div>

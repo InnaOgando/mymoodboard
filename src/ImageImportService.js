@@ -200,7 +200,34 @@ export async function flushPendingImageUploads() {
   }
 }
 
-// ── 4. Orphan cleanup ─────────────────────────────────────────────────────────
+// ── 4. Background image caching ──────────────────────────────────────────────
+
+/**
+ * For each image element in the list, download and cache the blob if not already
+ * in IndexedDB. Runs entirely in the background — never blocks the caller.
+ * Skips elements with no src or no hash. Skips already-cached hashes. Continues
+ * past individual fetch failures.
+ */
+export async function cacheImagesInBackground(elements) {
+  const images = elements.filter(
+    el => el.type === 'image' && el.content?.hash && el.content?.src
+  )
+  for (const el of images) {
+    const { hash, src } = el.content
+    try {
+      const existing = await getCachedBlob(hash)
+      if (existing) continue
+      const response = await fetch(src)
+      if (!response.ok) continue
+      const blob = await response.blob()
+      await setCachedImage(hash, blob)
+    } catch {
+      // one image failing must not stop the rest
+    }
+  }
+}
+
+// ── 5. Orphan cleanup ─────────────────────────────────────────────────────────
 
 /**
  * Delete from Supabase Storage if no other element references this image.

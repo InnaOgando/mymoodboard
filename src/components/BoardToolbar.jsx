@@ -1,16 +1,23 @@
 import { useState } from 'react'
 import { TOOLBAR_CONFIG, PANEL_DEFS } from './toolbarConfig'
+import textIcon       from '../assets/text.png'
+import linkIcon       from '../assets/link.png'
+import colorIcon      from '../assets/color.png'
+import todoIcon       from '../assets/to-do.png'
+import imageIcon      from '../assets/image.png'
+import docsIcon       from '../assets/docs.png'
+import collectionIcon from '../assets/collection.png'
 
 // Creation mode buttons — order matches PRODUCT_SPEC.md §BottomNav
 const CREATE_LEFT = [
-  { type: 'idea',    icon: '/text.png',  label: 'Idea' },
-  { type: 'link',    icon: '/link.png',  label: 'Link' },
-  { type: 'palette', icon: '/color.png', label: 'Palette' },
+  { type: 'idea',    icon: textIcon,  label: 'Idea' },
+  { type: 'link',    icon: linkIcon,  label: 'Link' },
+  { type: 'palette', icon: colorIcon, label: 'Palette' },
 ]
 const CREATE_RIGHT = [
-  { type: 'todo',     icon: '/to-do.png', label: 'To Do' },
-  { type: 'image',    icon: '/image.png', label: 'Image' },
-  { type: 'document', icon: '/docs.png',  label: 'Doc' },
+  { type: 'todo',     icon: todoIcon,  label: 'To Do' },
+  { type: 'image',    icon: imageIcon, label: 'Image' },
+  { type: 'document', icon: docsIcon,  label: 'Doc' },
 ]
 
 /**
@@ -42,7 +49,7 @@ export default function BoardToolbar({ selectedEl, selectedType, onAction, ...ac
             </button>
           ))}
           <button className="add-board-btn center-btn" onClick={() => onAction('board')}>
-            <img src="/collection.png" alt="Board" className="nav-icon-img" />
+            <img src={collectionIcon} alt="Board" className="nav-icon-img" />
             <span>Board</span>
           </button>
           {CREATE_RIGHT.map(item => (

@@ -33,6 +33,7 @@ export default defineConfig({
         }
       },
       workbox: {
+        globPatterns: ['**/*.{js,css,html,png,svg,ico,webp,woff2}'],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/iunqiswpbqijkqylfrll\.supabase\.co\/storage\/.*/i,

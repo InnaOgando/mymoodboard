@@ -7,6 +7,9 @@ import ImagePicker from './ImagePicker'
 import ObjectRenderer, { normalizeType } from './ObjectRenderer'
 import { getCollectionItems } from './objects/CollectionObject'
 import { processAndUpload, deleteImageIfOrphaned } from '../storage.js'
+import { cacheImagesInBackground } from '../ImageImportService'
+import screenshotIcon from '../assets/screenshot.png'
+import homeIcon       from '../assets/home.png'
 import BoardToolbar from './BoardToolbar'
 import ImagePreview from './ImagePreview'
 import CollectionGallery from './CollectionGallery'
@@ -176,7 +179,12 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
   async function load() {
     const b = await getBoard(boardId)
     setBoard(b)
-    const els = await getElements(boardId, { onSync: setElements })
+    const els = await getElements(boardId, {
+      onSync: fresh => {
+        setElements(fresh)
+        cacheImagesInBackground(fresh)
+      }
+    })
     setElements(els)
     const children = await getBoards(boardId, { onSync: setChildBoards })
     setChildBoards(children)
@@ -559,12 +567,12 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
         <button className="back-btn" onClick={onBack}>‹</button>
         <span className="board-title">{board.name}</span>
         <button className="paste-img-btn" onClick={pasteFromClipboard} title="Add screenshot">
-          <img src="/screenshot.png" alt="screenshot" style={{ width: 22, height: 22, objectFit: 'contain' }} />
+          <img src={screenshotIcon} alt="screenshot" style={{ width: 22, height: 22, objectFit: 'contain' }} />
         </button>
         <button className="backup-btn" onClick={handleExport} title="Exportar backup">⬇︎</button>
         <button className="backup-btn" onClick={() => importRef.current.click()} title="Restaurar backup">⬆︎</button>
         <button className="home-btn" onClick={onHome}>
-          <img src="/home.png" alt="home" style={{ width: 22, height: 22, objectFit: 'contain' }} />
+          <img src={homeIcon} alt="home" style={{ width: 22, height: 22, objectFit: 'contain' }} />
         </button>
       </header>
 
