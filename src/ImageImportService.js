@@ -227,6 +227,18 @@ export async function cacheImagesInBackground(elements) {
   }
 }
 
+export async function cacheAllBoardsInBackground(boards) {
+  const { getElements } = await import('./db')
+  for (const board of boards) {
+    try {
+      const elements = await getElements(board.id)
+      await cacheImagesInBackground(elements)
+    } catch {
+      // one board failing must not stop the rest
+    }
+  }
+}
+
 // ── 5. Orphan cleanup ─────────────────────────────────────────────────────────
 
 /**

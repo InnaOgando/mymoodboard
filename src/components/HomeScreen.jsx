@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { uid } from '../utils.js'
 import { getBoards, saveBoard, deleteBoard } from '../db'
+import { cacheAllBoardsInBackground } from '../ImageImportService'
 import { supabase } from '../supabase'
 import Canvas from './Canvas'
 import DraggableCard from './DraggableCard'
@@ -101,6 +102,7 @@ export default function HomeScreen({ onOpenBoard, session }) {
       onSync: boards => {
         if (!saved && boards.length) centerOnBoards(boards, canvasContainerRef, canvasOffsetRef, scaleRef)
         setBoards(boards)
+        cacheAllBoardsInBackground(boards)
       }
     })
 
