@@ -271,12 +271,20 @@ async function _syncBoardsDown(pid, userId, db, pendingDeletes) {
   // the fire-and-forget upsert resolves.
   const localBoards = await db.getAllFromIndex('boards', 'parentId', pid)
   const justPushedIds = new Set()
-  for (const b of localBoards) {
-    if (!supabaseIds.has(b.id) && !pendingDeletes.has(b.id)) {
-      supabase.from('boards').upsert(toSupabaseBoard(b, userId)).catch(() => {})
-      justPushedIds.add(b.id)
+  // Durable push: any local board the server lacks is uploaded now; if the
+  // upload fails (transient error / 500 / policy hiccup) it is queued in
+  // pendingOps so flushPendingOps retries it until confirmed — never lost.
+  await Promise.all(localBoards.map(async b => {
+    if (supabaseIds.has(b.id) || pendingDeletes.has(b.id)) return
+    justPushedIds.add(b.id)
+    try {
+      const { error } = await supabase.from('boards').upsert(toSupabaseBoard(b, userId))
+      if (error) throw error
+    } catch (e) {
+      console.warn('[db] reconcile board upsert failed, queued for retry:', b.id, e.message)
+      await _queueUpsert('board', b.id)
     }
-  }
+  }))
 
   // Write all Supabase boards into IndexedDB, skipping any whose local write
   // is still in-flight (delete tombstone, pending upsert op, or in-memory guard).
@@ -338,9 +346,9 @@ export async function saveBoard(board) {
   const normalized = { ...board, parentId: toParentId(board.parentId) }
   await db.put('boards', normalized)
   const userId = await currentUserId()
-  if (!userId) return
-  if (!navigator.onLine) {
-    // Queue a deduplicating upsert op so reconnect pushes the latest local state
+  // No user yet (auth still resolving) OR offline → queue a deduplicating upsert
+  // so the board is pushed durably once we can, instead of being lost locally.
+  if (!userId || !navigator.onLine) {
     await _queueUpsert('board', board.id)
     return
   }
@@ -421,11 +429,17 @@ async function _syncElementsDown(boardId, userId, db, pendingDeletes) {
 
   // Push any locally-created elements that Supabase doesn't have yet
   const localEls = await db.getAllFromIndex('elements', 'boardId', boardId)
-  for (const el of localEls) {
-    if (!supabaseIds.has(el.id) && !pendingDeletes.has(el.id)) {
-      supabase.from('elements').upsert(toSupabaseElement(el, userId)).catch(() => {})
+  // Durable push: upload any local element the server lacks; queue on failure.
+  await Promise.all(localEls.map(async el => {
+    if (supabaseIds.has(el.id) || pendingDeletes.has(el.id)) return
+    try {
+      const { error } = await supabase.from('elements').upsert(toSupabaseElement(el, userId))
+      if (error) throw error
+    } catch (e) {
+      console.warn('[db] reconcile element upsert failed, queued for retry:', el.id, e.message)
+      await _queueUpsert('element', el.id)
     }
-  }
+  }))
 
   if (!data || data.length === 0) return
 
@@ -448,8 +462,8 @@ export async function saveElement(el, { skipRemote = false } = {}) {
   await db.put('elements', el)
   if (skipRemote) return
   const userId = await currentUserId()
-  if (!userId) return
-  if (!navigator.onLine) {
+  // No user yet (auth still resolving) OR offline → queue a durable upsert.
+  if (!userId || !navigator.onLine) {
     await _queueUpsert('element', el.id)
     return
   }
