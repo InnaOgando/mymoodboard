@@ -3,7 +3,7 @@ import { supabase } from './supabase'
 import HomeScreen from './components/HomeScreen'
 import BoardScreen from './components/BoardScreen'
 import AuthScreen from './components/AuthScreen'
-import { flushPendingOps } from './db'
+import { flushPendingOps, purgeOldDeletions } from './db'
 import { flushPendingImageUploads } from './ImageImportService'
 import DebugPanel from './components/DebugPanel'
 import './App.css'
@@ -13,6 +13,7 @@ const SHOW_DEBUG = new URLSearchParams(window.location.search).get('debug') === 
 async function syncOnline() {
   await flushPendingOps()
   await flushPendingImageUploads()
+  await purgeOldDeletions()
 }
 
 function PasswordResetScreen({ onDone }) {

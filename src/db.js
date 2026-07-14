@@ -166,10 +166,11 @@ export async function flushPendingOps() {
   for (const op of ops) {
     try {
       if (op.entity === 'board' && op.op === 'delete') {
-        await supabase.from('elements').delete().eq('board_id', op.entityId).eq('user_id', userId)
-        await supabase.from('boards').delete().eq('id', op.entityId).eq('user_id', userId)
+        const ts = Date.now()
+        await supabase.from('elements').update({ deleted_at: ts }).eq('board_id', op.entityId).eq('user_id', userId)
+        await supabase.from('boards').update({ deleted_at: ts }).eq('id', op.entityId).eq('user_id', userId)
       } else if (op.entity === 'element' && op.op === 'delete') {
-        await supabase.from('elements').delete().eq('id', op.entityId).eq('user_id', userId)
+        await supabase.from('elements').update({ deleted_at: Date.now() }).eq('id', op.entityId).eq('user_id', userId)
       } else if (op.entity === 'element' && op.op === 'upsert') {
         // Read the current local value (the one we saved while offline) and push it
         const el = await db.get('elements', op.entityId)
@@ -184,6 +185,63 @@ export async function flushPendingOps() {
     } catch (e) {
       console.warn('[db] flushPendingOps: op failed, will retry:', op.id, e.message)
     }
+  }
+}
+
+// ── Tombstone garbage collection ───────────────────────────────────────────────
+// Soft-deleted rows are kept only as long as needed for every device to sync the
+// deletion. After PURGE_AFTER_MS they are hard-deleted so they stop occupying
+// space, and any image no live element still references is removed from Storage.
+const PURGE_AFTER_MS = 30 * 24 * 60 * 60 * 1000 // 30 days
+
+export async function purgeOldDeletions() {
+  if (!navigator.onLine) return
+  const userId = await currentUserId()
+  if (!userId) return
+  const cutoff = Date.now() - PURGE_AFTER_MS
+
+  try {
+    // 1) Expired soft-deleted elements — collect image hashes before removing rows.
+    const { data: deadEls, error: elErr } = await supabase
+      .from('elements')
+      .select('id, type, content')
+      .eq('user_id', userId)
+      .not('deleted_at', 'is', null)
+      .lt('deleted_at', cutoff)
+    if (elErr) throw elErr
+
+    const hashes = new Set(
+      (deadEls || [])
+        .filter(r => r.type === 'image' && r.content?.hash)
+        .map(r => r.content.hash)
+    )
+
+    // 2) Hard-delete the expired element rows.
+    if (deadEls && deadEls.length > 0) {
+      await supabase.from('elements').delete()
+        .eq('user_id', userId).not('deleted_at', 'is', null).lt('deleted_at', cutoff)
+    }
+
+    // 3) Free each image in Storage only if NO live element still references its hash.
+    for (const hash of hashes) {
+      const { data: live } = await supabase
+        .from('elements')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('type', 'image')
+        .is('deleted_at', null)
+        .filter('content->>hash', 'eq', hash)
+        .limit(1)
+      if (!live || live.length === 0) {
+        await supabase.storage.from('images').remove([`${userId}/${hash}.webp`])
+      }
+    }
+
+    // 4) Hard-delete the expired board rows.
+    await supabase.from('boards').delete()
+      .eq('user_id', userId).not('deleted_at', 'is', null).lt('deleted_at', cutoff)
+  } catch (e) {
+    console.warn('[db] purgeOldDeletions failed (will retry next start):', e.message)
   }
 }
 
@@ -263,20 +321,15 @@ async function _syncBoardsDown(pid, userId, db, pendingDeletes) {
   // error is null but data is also null.
   if (!Array.isArray(data)) return
 
+  // supabaseIds includes soft-deleted rows too, so the reconcile push never
+  // re-uploads a board the server already knows about (no resurrection).
   const supabaseIds = new Set(data.map(r => r.id))
 
-  // Push any locally-created boards that Supabase doesn't have yet
-  // (created offline or before first sync on this device).
-  // Track pushed IDs so the deletion step below does not remove them before
-  // the fire-and-forget upsert resolves.
+  // Durable push: upload only boards the server has NEVER seen (genuinely new);
+  // queue on failure so they are retried until confirmed — never lost.
   const localBoards = await db.getAllFromIndex('boards', 'parentId', pid)
-  const justPushedIds = new Set()
-  // Durable push: any local board the server lacks is uploaded now; if the
-  // upload fails (transient error / 500 / policy hiccup) it is queued in
-  // pendingOps so flushPendingOps retries it until confirmed — never lost.
   await Promise.all(localBoards.map(async b => {
     if (supabaseIds.has(b.id) || pendingDeletes.has(b.id)) return
-    justPushedIds.add(b.id)
     try {
       const { error } = await supabase.from('boards').upsert(toSupabaseBoard(b, userId))
       if (error) throw error
@@ -286,33 +339,27 @@ async function _syncBoardsDown(pid, userId, db, pendingDeletes) {
     }
   }))
 
-  // Write all Supabase boards into IndexedDB, skipping any whose local write
-  // is still in-flight (delete tombstone, pending upsert op, or in-memory guard).
+  // Apply server state to the local cache:
+  //   • deleted_at set → board was deleted somewhere → remove it locally
+  //   • otherwise      → write/update the live board
+  // Skips ids whose local write is still in-flight so we never clobber a fresh
+  // local change with older server data. Deletion is driven ONLY by an explicit
+  // deleted_at tombstone — never by mere absence — so a transient/partial server
+  // response can never wipe local boards.
   const pendingUpserts = await _getPendingUpsertIds()
-  if (data.length > 0) {
-    const tx = db.transaction('boards', 'readwrite')
-    for (const row of data) {
-      const board = fromSupabaseBoard(row)
-      if (pendingDeletes.has(board.id)) continue
-      if (pendingUpserts.has(board.id)) continue
-      if (_pendingBoardWrites.has(board.id)) continue
-      await tx.objectStore('boards').put({ ...board, parentId: toParentId(board.parentId) })
+  const tx = db.transaction('boards', 'readwrite')
+  for (const row of data) {
+    const board = fromSupabaseBoard(row)
+    if (pendingUpserts.has(board.id)) continue
+    if (_pendingBoardWrites.has(board.id)) continue
+    if (board.deletedAt) {
+      await tx.objectStore('boards').delete(board.id)   // propagate remote deletion
+      continue
     }
-    await tx.done
+    if (pendingDeletes.has(board.id)) continue
+    await tx.objectStore('boards').put({ ...board, parentId: toParentId(board.parentId) })
   }
-
-  // Propagate remote deletions: remove local boards absent from Supabase, but
-  // ONLY when they carry no pending operations of any kind. This runs only
-  // after a confirmed complete Supabase response (Array.isArray guard above).
-  const localBoardsNow = await db.getAllFromIndex('boards', 'parentId', pid)
-  for (const b of localBoardsNow) {
-    if (supabaseIds.has(b.id)) continue          // exists remotely — keep
-    if (pendingDeletes.has(b.id)) continue       // pending local delete — keep tombstone
-    if (pendingUpserts.has(b.id)) continue       // pending upload — keep
-    if (_pendingBoardWrites.has(b.id)) continue  // in-flight upsert — keep
-    if (justPushedIds.has(b.id)) continue        // just pushed this cycle — keep
-    await db.delete('boards', b.id)
-  }
+  await tx.done
 }
 
 export async function getBoard(id) {
@@ -323,9 +370,9 @@ export async function getBoard(id) {
     if (userId && navigator.onLine) {
       supabase.from('boards').select('*').eq('id', id).eq('user_id', userId).single()
         .then(({ data, error }) => {
-          if (!error && data && !_pendingBoardWrites.has(id)) {
-            db.put('boards', { ...fromSupabaseBoard(data), parentId: toParentId(data.parent_id) })
-          }
+          if (error || !data || _pendingBoardWrites.has(id)) return
+          if (data.deleted_at) { db.delete('boards', id); return }  // deleted elsewhere
+          db.put('boards', { ...fromSupabaseBoard(data), parentId: toParentId(data.parent_id) })
         })
         .catch(() => {})
     }
@@ -335,7 +382,7 @@ export async function getBoard(id) {
   const userId = await currentUserId()
   if (!userId || !navigator.onLine) return null
   const { data, error } = await supabase.from('boards').select('*').eq('id', id).eq('user_id', userId).single()
-  if (error || !data) return null
+  if (error || !data || data.deleted_at) return null
   const board = fromSupabaseBoard(data)
   await db.put('boards', { ...board, parentId: toParentId(board.parentId) })
   return board
@@ -365,8 +412,11 @@ export async function saveBoard(board) {
 
 export async function deleteBoard(id) {
   const db = await getDB()
+  const ts = Date.now()
+  // Recurse into child boards first so the whole subtree is removed.
   const children = await db.getAllFromIndex('boards', 'parentId', id)
   for (const child of children) await deleteBoard(child.id)
+  // Remove board + its elements from local immediately (instant UI feedback).
   const elements = await db.getAllFromIndex('elements', 'boardId', id)
   const tx = db.transaction(['boards', 'elements'], 'readwrite')
   for (const el of elements) await tx.objectStore('elements').delete(el.id)
@@ -376,8 +426,17 @@ export async function deleteBoard(id) {
   const userId = await currentUserId()
   if (!userId) return
   if (navigator.onLine) {
-    await supabase.from('elements').delete().eq('board_id', id).eq('user_id', userId)
-    await supabase.from('boards').delete().eq('id', id).eq('user_id', userId)
+    try {
+      // Soft-delete: keep the rows but stamp deleted_at so the deletion
+      // propagates to every device (each removes it locally on next sync)
+      // and the reconcile push can never resurrect it.
+      await supabase.from('elements').update({ deleted_at: ts }).eq('board_id', id).eq('user_id', userId)
+      const { error } = await supabase.from('boards').update({ deleted_at: ts }).eq('id', id).eq('user_id', userId)
+      if (error) throw error
+    } catch (e) {
+      console.warn('[db] deleteBoard soft-delete failed, queued for retry:', e.message)
+      await _queueOp({ entity: 'board', op: 'delete', entityId: id })
+    }
   } else {
     await _queueOp({ entity: 'board', op: 'delete', entityId: id })
   }
@@ -424,12 +483,14 @@ async function _syncElementsDown(boardId, userId, db, pendingDeletes) {
     console.warn('[db] getElements Supabase error:', error.message)
     return
   }
+  if (!Array.isArray(data)) return
 
-  const supabaseIds = new Set((data || []).map(r => r.id))
+  // supabaseIds includes soft-deleted rows so the reconcile push never
+  // re-uploads an element the server already knows about.
+  const supabaseIds = new Set(data.map(r => r.id))
 
-  // Push any locally-created elements that Supabase doesn't have yet
+  // Durable push: upload only elements the server has never seen; queue on failure.
   const localEls = await db.getAllFromIndex('elements', 'boardId', boardId)
-  // Durable push: upload any local element the server lacks; queue on failure.
   await Promise.all(localEls.map(async el => {
     if (supabaseIds.has(el.id) || pendingDeletes.has(el.id)) return
     try {
@@ -441,17 +502,18 @@ async function _syncElementsDown(boardId, userId, db, pendingDeletes) {
     }
   }))
 
-  if (!data || data.length === 0) return
-
-  // Write all Supabase elements into IndexedDB, skipping any whose local write
-  // is still in-flight (delete tombstone, persistent upsert op, or in-memory guard).
+  // Apply server state: deleted_at → remove locally; otherwise write the live row.
   const pendingUpserts = await _getPendingUpsertIds()
   const tx = db.transaction('elements', 'readwrite')
   for (const row of data) {
     const el = fromSupabaseElement(row)
-    if (pendingDeletes.has(el.id)) continue
     if (pendingUpserts.has(el.id)) continue
     if (_pendingElementWrites.has(el.id)) continue
+    if (el.deletedAt) {
+      await tx.objectStore('elements').delete(el.id)
+      continue
+    }
+    if (pendingDeletes.has(el.id)) continue
     await tx.objectStore('elements').put(el)
   }
   await tx.done
@@ -479,20 +541,23 @@ export async function saveElement(el, { skipRemote = false } = {}) {
 
 export async function deleteElement(id) {
   const db = await getDB()
+  const ts = Date.now()
   await db.delete('elements', id)
-  // Queue tombstone BEFORE Supabase delete so the background sync (which reads
+  // Queue tombstone BEFORE the network call so background sync (which reads
   // pendingOps to decide what to skip) never writes the element back.
   await _queueOp({ entity: 'element', op: 'delete', entityId: id })
   const userId = await currentUserId()
   if (!userId || !navigator.onLine) return
   try {
-    await supabase.from('elements').delete().eq('id', id).eq('user_id', userId)
-    // Remove tombstone only after Supabase confirms the delete
+    // Soft-delete: stamp deleted_at so the removal propagates to every device.
+    const { error } = await supabase.from('elements').update({ deleted_at: ts }).eq('id', id).eq('user_id', userId)
+    if (error) throw error
+    // Remove tombstone only after Supabase confirms the soft-delete
     const ops = await db.getAll('pendingOps')
     const op = ops.find(o => o.entity === 'element' && o.entityId === id)
     if (op) await db.delete('pendingOps', op.id)
   } catch (e) {
-    console.warn('[db] deleteElement Supabase failed, keeping tombstone:', e.message)
+    console.warn('[db] deleteElement soft-delete failed, keeping tombstone:', e.message)
   }
 }
 
@@ -508,6 +573,7 @@ function toSupabaseBoard(b, userId) {
     x: b.x ?? 0,
     y: b.y ?? 0,
     created_at: b.createdAt ?? Date.now(),
+    deleted_at: b.deletedAt ?? null,
   }
 }
 
@@ -520,6 +586,7 @@ function fromSupabaseBoard(row) {
     x: row.x ?? 0,
     y: row.y ?? 0,
     createdAt: row.created_at,
+    deletedAt: row.deleted_at ?? null,
   }
 }
 
@@ -535,6 +602,7 @@ function toSupabaseElement(el, userId) {
     h: el.h ?? null,
     content: el.content ?? {},
     created_at: el.createdAt ?? Date.now(),
+    deleted_at: el.deletedAt ?? null,
   }
 }
 
@@ -549,6 +617,7 @@ function fromSupabaseElement(row) {
     h: row.h ?? null,
     content: row.content ?? {},
     createdAt: row.created_at,
+    deletedAt: row.deleted_at ?? null,
   }
 }
 
