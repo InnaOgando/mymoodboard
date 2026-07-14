@@ -258,32 +258,53 @@ async function _syncBoardsDown(pid, userId, db, pendingDeletes) {
     console.warn('[db] getBoards Supabase error:', error.message)
     return
   }
+  // Guard: data must be a real array from a successful response before any
+  // deletion can occur. Protects against undefined Supabase JS behaviour where
+  // error is null but data is also null.
+  if (!Array.isArray(data)) return
 
-  const supabaseIds = new Set((data || []).map(r => r.id))
+  const supabaseIds = new Set(data.map(r => r.id))
 
   // Push any locally-created boards that Supabase doesn't have yet
-  // (created offline or before first sync on this device)
+  // (created offline or before first sync on this device).
+  // Track pushed IDs so the deletion step below does not remove them before
+  // the fire-and-forget upsert resolves.
   const localBoards = await db.getAllFromIndex('boards', 'parentId', pid)
+  const justPushedIds = new Set()
   for (const b of localBoards) {
     if (!supabaseIds.has(b.id) && !pendingDeletes.has(b.id)) {
       supabase.from('boards').upsert(toSupabaseBoard(b, userId)).catch(() => {})
+      justPushedIds.add(b.id)
     }
   }
-
-  if (!data || data.length === 0) return
 
   // Write all Supabase boards into IndexedDB, skipping any whose local write
   // is still in-flight (delete tombstone, pending upsert op, or in-memory guard).
   const pendingUpserts = await _getPendingUpsertIds()
-  const tx = db.transaction('boards', 'readwrite')
-  for (const row of data) {
-    const board = fromSupabaseBoard(row)
-    if (pendingDeletes.has(board.id)) continue
-    if (pendingUpserts.has(board.id)) continue
-    if (_pendingBoardWrites.has(board.id)) continue
-    await tx.objectStore('boards').put({ ...board, parentId: toParentId(board.parentId) })
+  if (data.length > 0) {
+    const tx = db.transaction('boards', 'readwrite')
+    for (const row of data) {
+      const board = fromSupabaseBoard(row)
+      if (pendingDeletes.has(board.id)) continue
+      if (pendingUpserts.has(board.id)) continue
+      if (_pendingBoardWrites.has(board.id)) continue
+      await tx.objectStore('boards').put({ ...board, parentId: toParentId(board.parentId) })
+    }
+    await tx.done
   }
-  await tx.done
+
+  // Propagate remote deletions: remove local boards absent from Supabase, but
+  // ONLY when they carry no pending operations of any kind. This runs only
+  // after a confirmed complete Supabase response (Array.isArray guard above).
+  const localBoardsNow = await db.getAllFromIndex('boards', 'parentId', pid)
+  for (const b of localBoardsNow) {
+    if (supabaseIds.has(b.id)) continue          // exists remotely — keep
+    if (pendingDeletes.has(b.id)) continue       // pending local delete — keep tombstone
+    if (pendingUpserts.has(b.id)) continue       // pending upload — keep
+    if (_pendingBoardWrites.has(b.id)) continue  // in-flight upsert — keep
+    if (justPushedIds.has(b.id)) continue        // just pushed this cycle — keep
+    await db.delete('boards', b.id)
+  }
 }
 
 export async function getBoard(id) {
