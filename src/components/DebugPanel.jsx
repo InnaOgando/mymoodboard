@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getDB, getDebugStats } from '../db'
+import { getDebugStats } from '../db'
 import { supabase } from '../supabase'
 
 // Access: add ?debug=1 to the URL
@@ -12,15 +12,31 @@ export default function DebugPanel() {
     try {
       const dbStats = await getDebugStats()
 
-      // Test Supabase reachability
+      // Test Supabase reachability + read remote counts + identity
       let supabaseOk = false
       let supabaseMs = null
+      let userEmail = null
+      let userIdShort = null
+      let remoteBoards = null
+      let remoteElements = null
       if (navigator.onLine) {
         try {
           const t0 = Date.now()
           const { error } = await supabase.from('boards').select('id').limit(1)
           supabaseMs = Date.now() - t0
           supabaseOk = !error
+
+          const { data: userData } = await supabase.auth.getUser()
+          userEmail = userData?.user?.email ?? null
+          const uid = userData?.user?.id ?? null
+          userIdShort = uid ? uid.slice(0, 8) : null
+
+          const { count: bCount } = await supabase
+            .from('boards').select('id', { count: 'exact', head: true })
+          remoteBoards = bCount ?? null
+          const { count: eCount } = await supabase
+            .from('elements').select('id', { count: 'exact', head: true })
+          remoteElements = eCount ?? null
         } catch { supabaseOk = false }
       }
 
@@ -28,6 +44,10 @@ export default function DebugPanel() {
         online: navigator.onLine,
         supabaseOk,
         supabaseMs,
+        userEmail,
+        userIdShort,
+        remoteBoards,
+        remoteElements,
         ...dbStats,
         cacheMB: (dbStats.cacheBytes / 1024 / 1024).toFixed(2),
         checkedAt: new Date().toLocaleTimeString(),
@@ -76,8 +96,18 @@ export default function DebugPanel() {
             </span>
           </div>
           <div className="debug-divider" />
+          <div className="debug-row"><span>Account</span><span>{stats.userEmail || '—'}</span></div>
+          <div className="debug-row"><span>User id</span><span>{stats.userIdShort || '—'}</span></div>
+          <div className="debug-divider" />
           <div className="debug-row"><span>Boards (local)</span><span>{stats.boards}</span></div>
+          <div className="debug-row">
+            <span>Boards (server)</span>
+            <span className={stats.remoteBoards != null && stats.remoteBoards !== stats.boards ? 'debug-warn' : ''}>
+              {stats.remoteBoards ?? '—'}
+            </span>
+          </div>
           <div className="debug-row"><span>Elements (local)</span><span>{stats.elements}</span></div>
+          <div className="debug-row"><span>Elements (server)</span><span>{stats.remoteElements ?? '—'}</span></div>
           <div className="debug-divider" />
           <div className="debug-row"><span>Cached images</span><span>{stats.cachedImages}</span></div>
           <div className="debug-row"><span>Cache size</span><span>{stats.cacheMB} MB</span></div>
