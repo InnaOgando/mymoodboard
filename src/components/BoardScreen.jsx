@@ -508,55 +508,107 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
     console.log('[placement] handleFiles imgs=' + imgs.length + ' docs=' + docs.length)
     const vp = getViewport()
 
-    // Bulk image layout: a COMPACT grid with a fixed number of columns.
-    // Fill left -> right across BULK_COLS columns, then wrap DOWN to the next row.
-    // Rows grow downward only as needed, so the whole batch stays together as one
-    // tight block (never a long horizontal strip, never a thin vertical column).
-    // Each image keeps its real proportions; each row is as tall as its tallest
-    // image, so images never overlap.
+    // ── Bulk image layout ──────────────────────────────────────────────────
+    // A COMPACT 3-column band that fills the VISIBLE empty space first, then,
+    // when it can't grow down (blocked by existing content), RELOCATES to the
+    // RIGHT — a fresh 3-column band just past the occupied columns, resuming at
+    // the same start row — and grows downward there. Reading order (left→right,
+    // then next row down). Keeps real proportions. Never overlaps.
     const IMG_W = 150
     const GAP = 20
     const MARGIN = 40
-    const BULK_COLS = 3               // <-- change this number to use 2, 4, ... columns
-    const bandLeft = vp.x + MARGIN
-    const bandRight = bandLeft + BULK_COLS * (IMG_W + GAP)
+    const BULK_COLS = 3            // band is always this many columns wide
+    const colStep = IMG_W + GAP
 
-    // Anchor the block just below any existing content sitting in these columns,
-    // so the new block never lands on top of what is already there.
-    let startY = vp.y + MARGIN
-    const existingBoxes = [
+    // Obstacles: everything already on the board.
+    const boxes = [
       ...elementsRef.current.map(el => ({ x: el.x, y: el.y, w: el.w || IMG_W, h: el.h || IMG_W })),
       ...childBoardsRef.current.map(b => ({ x: b.x, y: b.y, w: 148, h: 130 })),
     ]
-    for (const o of existingBoxes) {
-      const intersectsBand = o.x < bandRight && o.x + o.w > bandLeft
-      const belowViewTop = o.y + o.h > vp.y
-      if (intersectsBand && belowViewTop) startY = Math.max(startY, o.y + o.h + GAP)
+
+    // Does a row of `hs` heights placed at (left, top) hit any obstacle?
+    const rowOverlap = (left, top, hs) => {
+      for (let k = 0; k < hs.length; k++) {
+        const x = left + k * colStep, h = hs[k]
+        for (const o of boxes) {
+          if (x < o.x + o.w + GAP && x + IMG_W > o.x - GAP &&
+              top < o.y + o.h + GAP && top + h > o.y - GAP) return true
+        }
+      }
+      return false
+    }
+    // Lowest bottom of obstacles hitting this row band — used to jump down past them.
+    const pushBelow = (left, top, hs) => {
+      let ny = top
+      for (let k = 0; k < hs.length; k++) {
+        const x = left + k * colStep, h = hs[k]
+        for (const o of boxes) {
+          if (x < o.x + o.w + GAP && x + IMG_W > o.x - GAP &&
+              top < o.y + o.h + GAP && top + h > o.y - GAP) ny = Math.max(ny, o.y + o.h + GAP)
+        }
+      }
+      return ny
+    }
+    // First band X to the right where a row at `top` is free (past occupied columns).
+    const nextBandRight = (left, top, hs) => {
+      let L = left, g = 0
+      do { L += colStep; g++; if (g > 1000) break } while (rowOverlap(L, top, hs))
+      return L
     }
 
-    let rowTop = startY
-    let rowMaxH = 0
-    let i = 0
+    // Optimise all images first so we know every real height before laying out.
+    const metas = []
     for (const img of imgs) {
-      try {
-        const meta = await processAndUpload(img)
-        // Real height when the image is drawn at IMG_W wide
-        const dispH = meta.width ? Math.round(IMG_W * meta.height / meta.width) : IMG_W
-        const col = i % BULK_COLS
-        // Start a new row once the current row of BULK_COLS is full
-        if (col === 0 && i > 0) { rowTop += rowMaxH + GAP; rowMaxH = 0 }
-        const pos = {
-          x: Math.round(bandLeft + col * (IMG_W + GAP)),
-          y: Math.round(rowTop),
-        }
-        const el = await addElement('image', pos, meta)
-        if (el) logPlacement('Photos/file-picker', vp, pos, el)
-        rowMaxH = Math.max(rowMaxH, dispH)
-        i++
-      } catch (err) {
-        console.warn('[placement] handleFiles processAndUpload failed:', err)
-      }
+      try { metas.push(await processAndUpload(img)) }
+      catch (err) { console.warn('[placement] handleFiles processAndUpload failed:', err); metas.push(null) }
     }
+    const good = metas.filter(Boolean)
+    const heights = good.map(m => (m.width ? Math.round(IMG_W * m.height / m.width) : IMG_W))
+
+    // Group images into rows of BULK_COLS and place row by row.
+    const rows = []
+    for (let k = 0; k < heights.length; k += BULK_COLS) rows.push(heights.slice(k, k + BULK_COLS))
+
+    const placements = []              // { x, y } per image, in original order
+    let bandLeft = vp.x + MARGIN       // current band left (starts at visible left)
+    let rowTop = vp.y + MARGIN         // current row top (starts at visible top)
+    let startRowTop = null             // the row where the first image landed
+    let r = 0, guard = 0
+    while (r < rows.length) {
+      const hs = rows[r]
+      const rowH = Math.max(...hs)
+      if (rowOverlap(bandLeft, rowTop, hs)) {
+        if (startRowTop === null) {
+          // Still looking for the first free row in the initial band → jump down.
+          const ny = pushBelow(bandLeft, rowTop, hs)
+          rowTop = ny > rowTop ? ny : rowTop + 10
+        } else {
+          // Placed some rows already but blocked below → relocate band to the RIGHT,
+          // back at the start row.
+          bandLeft = nextBandRight(bandLeft, startRowTop, hs)
+          rowTop = startRowTop
+        }
+        if (++guard > 100000) break
+        continue
+      }
+      if (startRowTop === null) startRowTop = rowTop
+      for (let k = 0; k < hs.length; k++) {
+        const x = bandLeft + k * colStep
+        placements.push({ x: Math.round(x), y: Math.round(rowTop) })
+        boxes.push({ x, y: rowTop, w: IMG_W, h: hs[k] })
+      }
+      rowTop += rowH + GAP
+      r++
+    }
+
+    // Create the elements at their computed positions.
+    for (let k = 0; k < good.length; k++) {
+      const pos = placements[k]
+      if (!pos) continue
+      const el = await addElement('image', pos, good[k])
+      if (el) logPlacement('Photos/file-picker', vp, pos, el)
+    }
+
     for (const f of docs) {
       const pos = findFreePosition(elementsRef.current, childBoardsRef.current, vp)
       await addElement('document', pos, { name: f.name, type: f.type, src: await fileToBase64(f) })
