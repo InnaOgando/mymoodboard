@@ -537,23 +537,31 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
       }
       return false
     }
-    // Lowest bottom of obstacles hitting this row band — used to jump down past them.
-    const pushBelow = (left, top, hs) => {
-      let ny = top
-      for (let k = 0; k < hs.length; k++) {
-        const x = left + k * colStep, h = hs[k]
-        for (const o of boxes) {
-          if (x < o.x + o.w + GAP && x + IMG_W > o.x - GAP &&
-              top < o.y + o.h + GAP && top + h > o.y - GAP) ny = Math.max(ny, o.y + o.h + GAP)
-        }
-      }
-      return ny
-    }
     // First band X to the right where a row at `top` is free (past occupied columns).
     const nextBandRight = (left, top, hs) => {
       let L = left, g = 0
       do { L += colStep; g++; if (g > 1000) break } while (rowOverlap(L, top, hs))
       return L
+    }
+
+    // First free Y at/below `from` for a band at `left` (jumps below obstacles).
+    // The band may extend past the right edge of the screen — only the first
+    // column needs to be in view — so this works even on a narrow phone where a
+    // full 3-column band is wider than the visible width.
+    const firstFreeY = (left, from, hs) => {
+      let y = from, moved = true, g = 0
+      while (moved) {
+        moved = false
+        for (const o of boxes) {
+          for (let k = 0; k < hs.length; k++) {
+            const cx = left + k * colStep, h = hs[k]
+            if (cx < o.x + o.w + GAP && cx + IMG_W > o.x - GAP &&
+                y < o.y + o.h + GAP && y + h > o.y - GAP) { y = o.y + o.h + GAP; moved = true }
+          }
+        }
+        if (++g > 10000) break
+      }
+      return y
     }
 
     // Optimise all images first so we know every real height before laying out.
@@ -564,34 +572,49 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
     }
     const good = metas.filter(Boolean)
     const heights = good.map(m => (m.width ? Math.round(IMG_W * m.height / m.width) : IMG_W))
+    if (good.length === 0) return
 
-    // Group images into rows of BULK_COLS and place row by row.
+    // Group images into rows of BULK_COLS.
     const rows = []
     for (let k = 0; k < heights.length; k += BULK_COLS) rows.push(heights.slice(k, k + BULK_COLS))
 
+    // ANCHOR: read the VISIBLE viewport and drop the band into the HIGHEST free
+    // spot in view (reading order: top rows first, then leftmost). We test every
+    // band-left column whose first column is on screen and pick the one whose
+    // first row is free nearest the top. The band itself may run past the right
+    // edge — that is fine and expected. Only when the visible columns are full
+    // does the free spot land just below the content in view (never the far
+    // bottom of the whole canvas).
+    const visLeft = vp.x + MARGIN
+    const visTop = vp.y + MARGIN
+    const visRight = vp.x + vp.w - MARGIN
+    const probeRow = rows[0]
+
+    const candidateXs = []
+    for (let x = visLeft; x <= Math.max(visLeft, visRight - IMG_W); x += colStep) candidateXs.push(x)
+    if (candidateXs.length === 0) candidateXs.push(visLeft)
+
+    let bandLeft = candidateXs[0]
+    let startRowTop = firstFreeY(candidateXs[0], visTop, probeRow)
+    for (const x of candidateXs) {
+      const y = firstFreeY(x, visTop, probeRow)
+      if (y < startRowTop) { startRowTop = y; bandLeft = x }
+    }
+
     const placements = []              // { x, y } per image, in original order
-    let bandLeft = vp.x + MARGIN       // current band left (starts at visible left)
-    let rowTop = vp.y + MARGIN         // current row top (starts at visible top)
-    let startRowTop = null             // the row where the first image landed
+    let rowTop = startRowTop
     let r = 0, guard = 0
     while (r < rows.length) {
       const hs = rows[r]
       const rowH = Math.max(...hs)
       if (rowOverlap(bandLeft, rowTop, hs)) {
-        if (startRowTop === null) {
-          // Still looking for the first free row in the initial band → jump down.
-          const ny = pushBelow(bandLeft, rowTop, hs)
-          rowTop = ny > rowTop ? ny : rowTop + 10
-        } else {
-          // Placed some rows already but blocked below → relocate band to the RIGHT,
-          // back at the start row.
-          bandLeft = nextBandRight(bandLeft, startRowTop, hs)
-          rowTop = startRowTop
-        }
+        // Can't grow down here -> relocate the band to the RIGHT, just past the
+        // occupied columns, back at the start row; then keep growing down.
+        bandLeft = nextBandRight(bandLeft, startRowTop, hs)
+        rowTop = startRowTop
         if (++guard > 100000) break
         continue
       }
-      if (startRowTop === null) startRowTop = rowTop
       for (let k = 0; k < hs.length; k++) {
         const x = bandLeft + k * colStep
         placements.push({ x: Math.round(x), y: Math.round(rowTop) })
