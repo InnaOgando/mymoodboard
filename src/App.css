@@ -301,8 +301,7 @@ body {
   border-radius: 8px;
   box-shadow: var(--shadow);
   overflow: hidden;
-  min-width: 160px;
-  max-width: 320px;
+  /* width follows each object's inline w; no cap so resize handle stays on the corner */
 }
 .el-card:hover { box-shadow: var(--shadow-hover); }
 
