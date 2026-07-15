@@ -28,6 +28,7 @@ export default function PaletteObject({ el, selected, onUpdate, onResize, scaleR
   const selectedAtTouchStart = useRef(false)
   const idx = Math.min(activeIdx, colors.length - 1)
   const size = el.w || SWATCH_SIZE
+  const hexScale = Math.min(4, Math.max(0.6, size / SWATCH_SIZE))
   const w = size * colors.length + 6 * (colors.length - 1)
 
   function changeColor(i, hex) {
@@ -58,6 +59,7 @@ export default function PaletteObject({ el, selected, onUpdate, onResize, scaleR
               </div>
               <span
                 className={`palette-hex${copiedIdx === i ? ' copied' : ''}`}
+                style={{ fontSize: `${(0.65 * hexScale).toFixed(3)}rem` }}
                 onClick={e => {
                   e.stopPropagation()
                   navigator.clipboard?.writeText(color.toUpperCase())

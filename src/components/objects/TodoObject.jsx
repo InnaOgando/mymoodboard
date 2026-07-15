@@ -52,7 +52,7 @@ export default function TodoObject({ el, selected, editing, onUpdate, onResize, 
       <div className={`el-card el-todo ${selected ? 'selected' : ''}`} style={{ width: w }}>
         <div className="drag-handle">
           <span className="handle-dots">⠿</span>
-          <span className="idea-label">{title || 'To Do'}</span>
+          <span className="idea-label" style={{ fontSize: `${(0.65 * fontScale).toFixed(3)}rem` }}>{title || 'To Do'}</span>
         </div>
         {items.map((item, i) => (
           <div key={i} className="todo-item">

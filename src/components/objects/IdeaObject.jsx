@@ -84,7 +84,7 @@ export default function IdeaObject({ el, selected, editing, onUpdate, onResize, 
         style={{ width: w, height: h, background: bgColor || undefined }}>
         <div className="drag-handle">
           <span className="handle-dots">⠿</span>
-          <span className="idea-label">{title || 'Idea'}</span>
+          <span className="idea-label" style={{ fontSize: `${(0.65 * fontScale).toFixed(3)}rem` }}>{title || 'Idea'}</span>
           {speechAvail && (
             <button
               className={`idea-mic-btn ${listening ? 'listening' : ''}`}
