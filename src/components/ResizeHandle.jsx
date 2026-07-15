@@ -26,7 +26,7 @@ export default function ResizeHandle({ w, h, onResize, minW = 80, minH = 60, sca
     <div
       ref={divRef}
       className="resize-handle"
-      style={{ touchAction: 'none', padding: 16, margin: -16, boxSizing: 'content-box' }}
+      style={{ touchAction: 'none', padding: 22, margin: -22, boxSizing: 'content-box' }}
       onPointerDown={e => {
         startPtr.current = { x: e.clientX, y: e.clientY, w, h }
         engaged.current = false

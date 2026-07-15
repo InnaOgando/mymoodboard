@@ -30,8 +30,8 @@ export default function DocumentObject({ el, selected, onResize, scaleRef }) {
         {el.content.src && (
           <button className="doc-open" onPointerDown={e => e.stopPropagation()} onClick={openDoc}>Open</button>
         )}
-        {selected && <ResizeHandle w={w} h={null} onResize={nw => onResize(nw, null)} minW={140} scaleRef={scaleRef} />}
       </div>
+      {selected && <ResizeHandle w={w} h={null} onResize={nw => onResize(nw, null)} minW={140} scaleRef={scaleRef} />}
     </div>
   )
 }

@@ -249,16 +249,16 @@ body {
 /* ── Resize handle ── */
 .resize-handle {
   position: absolute;
-  bottom: -4px;
-  right: -4px;
-  width: 20px;
-  height: 20px;
+  bottom: -6px;
+  right: -6px;
+  width: 26px;
+  height: 26px;
   cursor: se-resize;
   touch-action: none;
-  background: radial-gradient(circle at 70% 70%, var(--accent) 3px, transparent 3px),
-              radial-gradient(circle at 40% 70%, var(--accent) 2px, transparent 2px),
-              radial-gradient(circle at 70% 40%, var(--accent) 2px, transparent 2px);
-  opacity: 0.6;
+  background: radial-gradient(circle at 72% 72%, var(--accent) 4px, transparent 4px),
+              radial-gradient(circle at 42% 72%, var(--accent) 3px, transparent 3px),
+              radial-gradient(circle at 72% 42%, var(--accent) 3px, transparent 3px);
+  opacity: 0.85;
 }
 
 /* ── Board icon card ── */

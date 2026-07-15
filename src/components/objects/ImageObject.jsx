@@ -25,8 +25,8 @@ export default function ImageObject({ el, selected, onResize, scaleRef }) {
         {el.content.caption && (
           <div className="image-caption">{el.content.caption}</div>
         )}
-        {selected && <ResizeHandle w={w} h={null} onResize={nw => onResize(nw, null)} minW={60} scaleRef={scaleRef} />}
       </div>
+      {selected && <ResizeHandle w={w} h={null} onResize={nw => onResize(nw, null)} minW={60} scaleRef={scaleRef} />}
     </div>
   )
 }

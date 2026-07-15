@@ -13,6 +13,7 @@ function shortUrl(url) {
 export default function LinkObject({ el, selected, editing, onUpdate, onStopEdit, onResize, scaleRef }) {
   const urlRef = useRef()
   const w = el.w || 260
+  const fontScale = Math.min(4, Math.max(0.6, w / 260))
   const url = el.content.url || ''
 
   useEffect(() => {
@@ -45,15 +46,15 @@ export default function LinkObject({ el, selected, editing, onUpdate, onStopEdit
         ) : (
           <div className="link-view">
             {url
-              ? <span className="link-view-url">
+              ? <span className="link-view-url" style={{ fontSize: `${(0.78 * fontScale).toFixed(3)}rem` }}>
                   <img src={linkIcon} alt="" style={{ width: 12, height: 12, objectFit: 'contain', marginRight: 4, verticalAlign: 'middle', opacity: 0.6 }} />
                   {shortUrl(url)}
                 </span>
-              : <span className="link-view-url link-view-placeholder">Two taps to open URL</span>}
+              : <span className="link-view-url link-view-placeholder" style={{ fontSize: `${(0.78 * fontScale).toFixed(3)}rem` }}>Two taps to open URL</span>}
           </div>
         )}
-        {selected && <ResizeHandle w={w} h={null} onResize={nw => onResize(nw, null)} minW={160} scaleRef={scaleRef} />}
       </div>
+      {selected && <ResizeHandle w={w} h={null} onResize={nw => onResize(nw, null)} minW={160} scaleRef={scaleRef} />}
     </div>
   )
 }

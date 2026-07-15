@@ -9,6 +9,7 @@ export default function TodoObject({ el, selected, editing, onUpdate, onResize, 
   }, [editing])
   const title = el.content.title || ''
   const w = el.w || 260
+  const fontScale = Math.min(4, Math.max(0.6, w / 260))
   const inputRefs = useRef({})
 
   function toggle(i) {
@@ -64,15 +65,15 @@ export default function TodoObject({ el, selected, editing, onUpdate, onResize, 
               className={`todo-input ${item.done ? 'done' : ''}`}
               value={item.text || ''}
               readOnly={!editing}
-              style={{ pointerEvents: editing ? 'auto' : 'none' }}
+              style={{ pointerEvents: editing ? 'auto' : 'none', fontSize: `${fontScale.toFixed(3)}rem` }}
               onChange={e => updateItem(i, e.target.value)}
               onKeyDown={e => handleKeyDown(e, i)}
               placeholder="Task…"
             />
           </div>
         ))}
-        {selected && <ResizeHandle w={w} h={null} onResize={nw => onResize(nw, null)} minW={160} scaleRef={scaleRef} />}
       </div>
+      {selected && <ResizeHandle w={w} h={null} onResize={nw => onResize(nw, null)} minW={160} scaleRef={scaleRef} />}
     </div>
   )
 }
