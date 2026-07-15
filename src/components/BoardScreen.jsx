@@ -65,15 +65,21 @@ function findFreePosition(existingElements, childBoards, viewportBounds, objW = 
     y += objH + GAP
   }
 
-  // Viewport full — place just below the lowest box already on screen,
-  // not a full viewport away, so the new object stays beside current work.
+  // Visible area full — keep the SAME reading order (left -> right, top -> bottom)
+  // and continue scanning into rows just below the visible area until a truly free
+  // slot is found. Never overlaps; the item lands in the next available space
+  // beside current work, not a blind vertical stack.
+  const MAX_SCAN_Y = startY + 100000
+  for (let yy = startY; yy < MAX_SCAN_Y; yy += objH + GAP) {
+    for (let xx = startX; xx <= endX; xx += objW + GAP) {
+      if (!overlaps(xx, yy)) return { x: Math.round(xx), y: Math.round(yy) }
+    }
+  }
+
+  // Absolute last resort (should never be reached): just below the lowest box.
   const lowestBottom = allBoxes.reduce((max, o) => Math.max(max, o.y + o.h), startY)
-  const fallbackPos = { x: Math.round(startX), y: Math.round(lowestBottom + GAP) }
-  console.warn('[placement] findFreePosition FALLBACK — viewport full.',
-    'startY=' + Math.round(startY), 'endY=' + Math.round(endY),
-    'lowestBottom=' + Math.round(lowestBottom),
-    '→', JSON.stringify(fallbackPos))
-  return fallbackPos
+  console.warn('[placement] findFreePosition hard fallback — extended scan exhausted.')
+  return { x: Math.round(startX), y: Math.round(lowestBottom + GAP) }
 }
 
 export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, onHome }) {
@@ -152,10 +158,13 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
   // Shared helper — the single image-from-blob placement path.
   // Captures viewport BEFORE any async work so pan/zoom during upload is irrelevant.
   async function addImageFromBlob(blob, source = 'unknown') {
-    const vp  = getViewport()
-    const pos = findFreePosition(elementsRef.current, childBoardsRef.current, vp, 150, 150)
+    // Capture the viewport BEFORE any async work so pan/zoom during upload is irrelevant.
+    const vp = getViewport()
     try {
       const meta = await processAndUpload(blob)
+      // Find the slot using the image's REAL height so it never overlaps neighbours.
+      const dispH = meta.width ? Math.round(150 * meta.height / meta.width) : 150
+      const pos = findFreePosition(elementsRef.current, childBoardsRef.current, vp, 150, dispH)
       const el = await addElement('image', pos, meta)
       if (el) logPlacement(source, vp, pos, el)
     } catch (err) {
@@ -191,13 +200,19 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
   }
 
   async function addElement(type, pos, content = {}, { skipRemote = false } = {}) {
+    const IMG_W = 150
     const el = {
       id: uid(),
       boardId,
       type,
       x: pos.x,
       y: pos.y,
-      w: type === 'image' ? 150 : undefined,
+      w: type === 'image' ? IMG_W : undefined,
+      // Store the real display height (image drawn at IMG_W wide) so placement
+      // math knows each image's true footprint and rows never overlap.
+      h: type === 'image' && content.width
+        ? Math.round(IMG_W * content.height / content.width)
+        : undefined,
       content,
       createdAt: Date.now()
     }
@@ -493,14 +508,51 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
     console.log('[placement] handleFiles imgs=' + imgs.length + ' docs=' + docs.length)
     const vp = getViewport()
 
-    // addElement updates elementsRef.current synchronously, so each iteration
-    // sees the previously placed image and avoids overlap automatically.
+    // Bulk image layout: a COMPACT grid with a fixed number of columns.
+    // Fill left -> right across BULK_COLS columns, then wrap DOWN to the next row.
+    // Rows grow downward only as needed, so the whole batch stays together as one
+    // tight block (never a long horizontal strip, never a thin vertical column).
+    // Each image keeps its real proportions; each row is as tall as its tallest
+    // image, so images never overlap.
+    const IMG_W = 150
+    const GAP = 20
+    const MARGIN = 40
+    const BULK_COLS = 3               // <-- change this number to use 2, 4, ... columns
+    const bandLeft = vp.x + MARGIN
+    const bandRight = bandLeft + BULK_COLS * (IMG_W + GAP)
+
+    // Anchor the block just below any existing content sitting in these columns,
+    // so the new block never lands on top of what is already there.
+    let startY = vp.y + MARGIN
+    const existingBoxes = [
+      ...elementsRef.current.map(el => ({ x: el.x, y: el.y, w: el.w || IMG_W, h: el.h || IMG_W })),
+      ...childBoardsRef.current.map(b => ({ x: b.x, y: b.y, w: 148, h: 130 })),
+    ]
+    for (const o of existingBoxes) {
+      const intersectsBand = o.x < bandRight && o.x + o.w > bandLeft
+      const belowViewTop = o.y + o.h > vp.y
+      if (intersectsBand && belowViewTop) startY = Math.max(startY, o.y + o.h + GAP)
+    }
+
+    let rowTop = startY
+    let rowMaxH = 0
+    let i = 0
     for (const img of imgs) {
-      const pos = findFreePosition(elementsRef.current, childBoardsRef.current, vp, 150, 150)
       try {
         const meta = await processAndUpload(img)
+        // Real height when the image is drawn at IMG_W wide
+        const dispH = meta.width ? Math.round(IMG_W * meta.height / meta.width) : IMG_W
+        const col = i % BULK_COLS
+        // Start a new row once the current row of BULK_COLS is full
+        if (col === 0 && i > 0) { rowTop += rowMaxH + GAP; rowMaxH = 0 }
+        const pos = {
+          x: Math.round(bandLeft + col * (IMG_W + GAP)),
+          y: Math.round(rowTop),
+        }
         const el = await addElement('image', pos, meta)
         if (el) logPlacement('Photos/file-picker', vp, pos, el)
+        rowMaxH = Math.max(rowMaxH, dispH)
+        i++
       } catch (err) {
         console.warn('[placement] handleFiles processAndUpload failed:', err)
       }
