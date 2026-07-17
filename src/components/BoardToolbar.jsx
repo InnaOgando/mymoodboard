@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { TOOLBAR_CONFIG, PANEL_DEFS } from './toolbarConfig'
-import textIcon       from '../assets/text.png'
-import linkIcon       from '../assets/link.png'
-import colorIcon      from '../assets/color.png'
-import todoIcon       from '../assets/to-do.png'
-import imageIcon      from '../assets/image.png'
-import docsIcon       from '../assets/docs.png'
-import collectionIcon from '../assets/collection.png'
+import textIcon       from '../assets/note.svg'
+import linkIcon       from '../assets/link.svg'
+import colorIcon      from '../assets/palette.svg'
+import todoIcon       from '../assets/todo.svg'
+import imageIcon      from '../assets/image.svg'
+import docsIcon       from '../assets/document.svg'
+import collectionIcon from '../assets/board.svg'
 
 // Creation mode buttons — order matches PRODUCT_SPEC.md §BottomNav
 const CREATE_LEFT = [

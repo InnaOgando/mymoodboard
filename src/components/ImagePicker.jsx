@@ -1,5 +1,5 @@
 import { useRef } from 'react'
-import imageIcon from '../assets/image.png'
+import imageIcon from '../assets/image.svg'
 
 export default function ImagePicker({ onFiles, onClose }) {
   const fileRef = useRef()

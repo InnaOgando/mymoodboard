@@ -8,8 +8,9 @@
   --border-light: #ebebeb;
   --text: #1a1a1a;
   --muted: #999;
-  --accent: #e8315a;
-  --accent2: #c82848;
+  --accent: #e0576e;
+  --accent2: #c9455c;
+  --accent-soft: #fc8292;
   --note-bg: #fffbe6;
   --note-border: #f0e68c;
   --radius: 10px;
@@ -255,9 +256,9 @@ body {
   height: 26px;
   cursor: se-resize;
   touch-action: none;
-  background: radial-gradient(circle at 72% 72%, var(--accent) 4px, transparent 4px),
-              radial-gradient(circle at 42% 72%, var(--accent) 3px, transparent 3px),
-              radial-gradient(circle at 72% 42%, var(--accent) 3px, transparent 3px);
+  background: radial-gradient(circle at 72% 72%, var(--accent-soft) 4px, transparent 4px),
+              radial-gradient(circle at 42% 72%, var(--accent-soft) 3px, transparent 3px),
+              radial-gradient(circle at 72% 42%, var(--accent-soft) 3px, transparent 3px);
   opacity: 0.85;
 }
 
@@ -278,7 +279,7 @@ body {
   transition: box-shadow 0.15s;
 }
 .board-icon-card:hover { box-shadow: var(--shadow-hover); }
-.board-icon-card.selected { outline: 2.5px solid var(--accent); }
+.board-icon-card.selected { outline: 2.5px solid var(--accent-soft); }
 
 .board-icon-emoji { font-size: 2.4rem; }
 .board-color-dot { width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0; }
@@ -407,8 +408,8 @@ body {
 }
 
 /* Selected state */
-.el-card.selected { outline: 2px solid var(--accent); }
-.el-image.selected { outline: 2px solid var(--accent); }
+.el-card.selected { outline: 2px solid var(--accent-soft); }
+.el-image.selected { outline: 2px solid var(--accent-soft); }
 .draggable-card.selected { z-index: 20; }
 
 /* Long-press drag feedback */
@@ -690,7 +691,7 @@ body {
   cursor: pointer;
   font-size: 0.78rem;
   font-weight: 600;
-  box-shadow: 0 2px 8px rgba(232,49,90,0.3);
+  box-shadow: 0 2px 8px rgba(224,87,110,0.3);
 }
 .add-board-btn:hover { background: var(--accent2); }
 .add-board-icon { font-size: 1.2rem; line-height: 1; }
@@ -957,7 +958,7 @@ body {
 .el-card.drop-target,
 .el-collection.drop-target {
   outline: 2.5px dashed var(--accent);
-  box-shadow: 0 0 0 4px rgba(232,49,90,0.15);
+  box-shadow: 0 0 0 4px rgba(252,130,146,0.15);
 }
 
 /* ── Collection card (universal container) ── */
@@ -971,7 +972,7 @@ body {
   max-width: none;
 }
 .el-collection:hover { box-shadow: 0 5px 18px rgba(0,0,0,0.18); }
-.el-collection.selected { outline: 2px solid var(--accent); }
+.el-collection.selected { outline: 2px solid var(--accent-soft); }
 
 /* ── Collection header ── */
 .col-header {
@@ -1200,7 +1201,7 @@ body {
   flex-shrink: 0;
 }
 .idea-mic-btn.listening {
-  background: rgba(232,49,90,0.12);
+  background: rgba(252,130,146,0.12);
   animation: pulse 1s infinite;
 }
 .speech-msg {

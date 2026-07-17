@@ -4,7 +4,7 @@
   <defs>
     <style>
       .st0 {
-        fill: #7ccbd0;
+        fill: #fff;
       }
 
       .st1 {
@@ -12,24 +12,16 @@
       }
 
       .st2 {
-        fill: #f9aca9;
-      }
-
-      .st3 {
         fill: #e1e4ea;
-      }
-
-      .st4 {
-        fill: #9db8dd;
       }
     </style>
   </defs>
-  <rect class="st3" width="24" height="24"/>
+  <rect class="st2" width="24" height="24"/>
   <circle class="st1" cx="12" cy="12" r="10.08"/>
   <g id="_x35_12">
     <rect class="st0" x="5.55" y="12.87" width="5.53" height="5.61" rx=".26" ry=".26"/>
-    <ellipse class="st2" cx="15.69" cy="15.68" rx="2.77" ry="2.8"/>
-    <path class="st4" d="M8.11,5.67l-2.55,5.11c-.08.15.04.33.21.33h5.1c.17,0,.28-.18.21-.33l-2.55-5.11c-.08-.17-.33-.17-.41,0Z"/>
-    <path class="st3" d="M18.46,11.13h-4.72c-.45,0-.82-.38-.82-.84v-4.77h1.39v4.21h4.16v1.41Z"/>
+    <ellipse class="st0" cx="15.69" cy="15.68" rx="2.77" ry="2.8"/>
+    <path class="st0" d="M8.11,5.67l-2.55,5.11c-.08.15.04.33.21.33h5.1c.17,0,.28-.18.21-.33l-2.55-5.11c-.08-.17-.33-.17-.41,0Z"/>
+    <path class="st0" d="M18.46,11.13h-4.72c-.45,0-.82-.38-.82-.84v-4.77h1.39v4.21h4.16v1.41Z"/>
   </g>
 </svg>

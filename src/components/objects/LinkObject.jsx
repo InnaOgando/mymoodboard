@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import ResizeHandle from '../ResizeHandle'
-import linkIcon from '../../assets/link.png'
+import linkIcon from '../../assets/link.svg'
 
 function shortUrl(url) {
   try {

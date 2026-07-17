@@ -1,17 +1,18 @@
 // Shared preset color palette — used by Boards, Collections, and Palette objects.
+// Source: src/assets/Refmemo_icons/color scheme.svg (app color scheme), visual order.
 export const PRESET_COLORS = [
-  '#e8315a', // coral red
-  '#f4845f', // salmon
-  '#f7c948', // golden yellow
-  '#a8d45f', // lime
-  '#4caf82', // emerald
-  '#2dc7b2', // teal
-  '#4a90d9', // sky blue
-  '#5f6bc4', // indigo
-  '#9b6dd6', // purple
-  '#e91e8c', // hot pink
-  '#f9a8d4', // blush
-  '#00bcd4', // cyan
-  '#94a3b8', // slate
-  '#78716c', // warm brown
+  '#fdd8ad', // peach
+  '#f9aca9', // salmon
+  '#fc8292', // coral pink
+  '#eedcf7', // lilac
+  '#eda2d2', // pink
+  '#cea7db', // mauve
+  '#d6d9dd', // light gray
+  '#cae5dc', // mint
+  '#afe2e3', // aqua
+  '#7ccbd0', // teal
+  '#b7e7fd', // sky
+  '#7aa7f4', // blue
+  '#9db8dd', // blue-gray
+  '#b3b8c0', // slate
 ]
