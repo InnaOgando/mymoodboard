@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { uid, openUrl } from '../utils.js'
-import { getBoard, getBoards, saveBoard, deleteBoard, getElements, saveElement, deleteElement, exportAllData, importAllData } from '../db'
+import { getBoard, getBoards, saveBoard, deleteBoard, getElements, saveElement, deleteElement, exportAllData, importAllData, getStorageUsage } from '../db'
 import Canvas from './Canvas'
 import DraggableCard from './DraggableCard'
 import ImagePicker from './ImagePicker'
@@ -93,6 +93,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
   const [dropOverCollectionId, _setDropOverCollectionId] = useState(null)
   const [undoStack, setUndoStack] = useState([])
   const [undoVisible, setUndoVisible] = useState(false)
+  const [storageMsg, setStorageMsg] = useState(null)
   const [previewEl, setPreviewEl] = useState(null)       // image preview modal
   const [galleryEl, setGalleryEl] = useState(null)       // collection gallery modal
 
@@ -161,12 +162,23 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
     // Capture the viewport BEFORE any async work so pan/zoom during upload is irrelevant.
     const vp = getViewport()
     try {
+      const usage = await getStorageUsage()
+      if (usage.bytes >= usage.limit) {
+        setStorageMsg('Storage cheio (150 MB). Apaga imagens para adicionar mais.')
+        setTimeout(() => setStorageMsg(null), 6000)
+        return
+      }
       const meta = await processAndUpload(blob)
       // Find the slot using the image's REAL height so it never overlaps neighbours.
       const dispH = meta.width ? Math.round(150 * meta.height / meta.width) : 150
       const pos = findFreePosition(elementsRef.current, childBoardsRef.current, vp, 150, dispH)
       const el = await addElement('image', pos, meta)
       if (el) logPlacement(source, vp, pos, el)
+      const after = await getStorageUsage()
+      if (after.ratio >= 0.8) {
+        setStorageMsg(`Já usaste ${Math.round(after.bytes / 1048576)} MB de 150 MB.`)
+        setTimeout(() => setStorageMsg(null), 5000)
+      }
     } catch (err) {
       console.warn('[placement] addImageFromBlob processAndUpload failed:', err)
     }
@@ -564,6 +576,13 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
       return y
     }
 
+    const preUsage = await getStorageUsage()
+    if (preUsage.bytes >= preUsage.limit) {
+      setStorageMsg('Storage cheio (150 MB). Apaga imagens para adicionar mais.')
+      setTimeout(() => setStorageMsg(null), 6000)
+      return
+    }
+
     // Optimise all images first so we know every real height before laying out.
     const metas = []
     for (const img of imgs) {
@@ -696,8 +715,6 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
         <button className="paste-img-btn" onClick={pasteFromClipboard} title="Add screenshot">
           <img src={screenshotIcon} alt="screenshot" style={{ width: 22, height: 22, objectFit: 'contain' }} />
         </button>
-        <button className="backup-btn" onClick={handleExport} title="Exportar backup">⬇︎</button>
-        <button className="backup-btn" onClick={() => importRef.current.click()} title="Restaurar backup">⬆︎</button>
         <button className="home-btn" onClick={onHome}>
           <img src={homeIcon} alt="home" style={{ width: 22, height: 22, objectFit: 'contain' }} />
         </button>
@@ -821,6 +838,13 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
           <span>Item apagado</span>
           <button className="undo-btn" onClick={undo}>Desfazer</button>
           <button className="undo-close" onPointerDown={e => e.stopPropagation()} onClick={() => setUndoVisible(false)}>×</button>
+        </div>
+      )}
+
+      {storageMsg && (
+        <div className="undo-toast">
+          <span>{storageMsg}</span>
+          <button className="undo-close" onPointerDown={e => e.stopPropagation()} onClick={() => setStorageMsg(null)}>×</button>
         </div>
       )}
 

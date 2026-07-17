@@ -121,6 +121,32 @@ function _dataUrlToBlob(dataUrl) {
 
 // ── Debug stats ───────────────────────────────────────────────────────────────
 
+// ── Per-user storage usage (tester-phase soft cap) ───────────────────────────
+export const STORAGE_LIMIT_BYTES = 150 * 1024 * 1024  // 150 MB per user
+
+// Sum of UNIQUE image bytes the user holds (deduplicated by hash), counting both
+// board images and images nested inside collections. Fully client-side (reads
+// IndexedDB only) so it costs no Supabase egress.
+export async function getStorageUsage() {
+  const db = await getDB()
+  const elements = await db.getAll('elements')
+  const seen = new Map()
+  const add = (c) => {
+    if (c && c.hash && typeof c.sizeBytes === 'number' && !seen.has(c.hash)) {
+      seen.set(c.hash, c.sizeBytes)
+    }
+  }
+  for (const el of elements) {
+    if (el.deleted_at) continue
+    if (el.type === 'image') add(el.content)
+    const items = el.content && el.content.items
+    if (Array.isArray(items)) for (const it of items) if (it && it.type === 'image') add(it.content)
+  }
+  let bytes = 0
+  for (const v of seen.values()) bytes += v
+  return { bytes, limit: STORAGE_LIMIT_BYTES, ratio: STORAGE_LIMIT_BYTES ? bytes / STORAGE_LIMIT_BYTES : 0 }
+}
+
 export async function getDebugStats() {
   const db = await getDB()
   const [boards, elements, imageCache, pendingOps] = await Promise.all([
@@ -636,23 +662,67 @@ export async function setConfig(key, value) {
 
 // ── Backup / Restore ──────────────────────────────────────────────────────────
 
+function _blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader()
+    r.onload = () => resolve(r.result)
+    r.onerror = reject
+    r.readAsDataURL(blob)
+  })
+}
+
 export async function exportAllData() {
   const db = await getDB()
   const boards = await db.getAll('boards')
   const elements = await db.getAll('elements')
-  return { version: 1, exportedAt: Date.now(), boards, elements }
+  // Collect every unique image hash referenced by live elements (board images
+  // AND images nested inside collections), then embed the actual bytes so the
+  // backup restores real pictures — not just dead links.
+  const hashes = new Set()
+  for (const el of elements) {
+    if (el.deleted_at) continue
+    if (el.type === 'image' && el.content && el.content.hash) hashes.add(el.content.hash)
+    const items = el.content && el.content.items
+    if (Array.isArray(items)) for (const it of items) if (it && it.type === 'image' && it.content && it.content.hash) hashes.add(it.content.hash)
+  }
+  const images = []
+  for (const hash of hashes) {
+    const blob = await getCachedBlob(hash)
+    if (blob) images.push({ hash, dataUrl: await _blobToDataUrl(blob) })
+  }
+  return { version: 2, exportedAt: Date.now(), boards, elements, images }
 }
 
 export async function importAllData(data) {
   if (!data?.boards || !data?.elements) throw new Error('Invalid backup file')
   const db = await getDB()
+
+  // Restore embedded image bytes first so pictures render immediately from cache.
+  const restored = new Set()
+  if (Array.isArray(data.images)) {
+    for (const img of data.images) {
+      if (img && img.hash && img.dataUrl) {
+        await setCachedImage(img.hash, _dataUrlToBlob(img.dataUrl))
+        restored.add(img.hash)
+      }
+    }
+  }
+
+  // Mark restored images as pending so they re-upload to Storage (repairs any
+  // dead URLs). flushPendingImageUploads() is called by the UI after import.
+  const elements = data.elements.map(e =>
+    (e.type === 'image' && e.content && e.content.hash && restored.has(e.content.hash))
+      ? { ...e, content: { ...e.content, syncStatus: 'pending' } }
+      : e
+  )
+
   const tx = db.transaction(['boards', 'elements'], 'readwrite')
   for (const b of data.boards) await tx.objectStore('boards').put(b)
-  for (const e of data.elements) await tx.objectStore('elements').put(e)
+  for (const e of elements) await tx.objectStore('elements').put(e)
   await tx.done
   const userId = await currentUserId()
   if (userId) {
     for (const b of data.boards) await supabase.from('boards').upsert(toSupabaseBoard(b, userId))
-    for (const e of data.elements) await supabase.from('elements').upsert(toSupabaseElement(e, userId))
+    for (const e of elements) await supabase.from('elements').upsert(toSupabaseElement(e, userId))
   }
 }

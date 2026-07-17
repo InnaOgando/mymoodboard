@@ -1651,3 +1651,27 @@ body {
 .draggable-card.selected .el-card[data-locked="true"] {
   outline-color: var(--muted);
 }
+
+/* ── Storage meter (Home top bar) ── */
+.storage-meter { display: flex; align-items: center; gap: 6px; }
+.storage-meter-track {
+  width: 90px;
+  height: 7px;
+  border-radius: 4px;
+  background: #e6e6e6;
+  overflow: hidden;
+}
+.storage-meter-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease, background 0.3s ease;
+}
+.storage-meter-label {
+  font-size: 0.7rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ── Top-bar right group (meter + backup + logout) ── */
+.top-bar-right { display: flex; align-items: center; gap: 10px; }

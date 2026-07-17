@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { uid } from '../utils.js'
-import { getBoards, saveBoard, deleteBoard } from '../db'
-import { cacheAllBoardsInBackground } from '../ImageImportService'
+import { getBoards, saveBoard, deleteBoard, getStorageUsage, STORAGE_LIMIT_BYTES, exportAllData, importAllData } from '../db'
+import { cacheAllBoardsInBackground, flushPendingImageUploads } from '../ImageImportService'
 import { supabase } from '../supabase'
 import Canvas from './Canvas'
 import DraggableCard from './DraggableCard'
@@ -178,11 +178,71 @@ export default function HomeScreen({ onOpenBoard, session }) {
 
   const selectedBoard = boards.find(b => b.id === selectedId)
 
+  const [usage, setUsage] = useState({ bytes: 0, limit: STORAGE_LIMIT_BYTES, ratio: 0 })
+  useEffect(() => {
+    let alive = true
+    getStorageUsage().then(u => { if (alive) setUsage(u) })
+    return () => { alive = false }
+  }, [])
+
+  const [backupMenuOpen, setBackupMenuOpen] = useState(false)
+  const [backupTip, setBackupTip] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const importRef = useRef()
+
+  // Weekly nudge: prompt a backup if it's been over 7 days (or never).
+  useEffect(() => {
+    const last = Number(localStorage.getItem('refmemo_last_backup') || 0)
+    if (!last || (Date.now() - last) / 86400000 >= 7) setBackupTip(true)
+  }, [])
+
+  async function handleExport() {
+    setBusy(true)
+    try {
+      const data = await exportAllData()
+      const blob = new Blob([JSON.stringify(data)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `refmemo-backup-${new Date().toISOString().slice(0, 10)}.json`
+      document.body.appendChild(a); a.click(); document.body.removeChild(a)
+      setTimeout(() => URL.revokeObjectURL(url), 8000)
+      localStorage.setItem('refmemo_last_backup', String(Date.now()))
+      setBackupTip(false); setBackupMenuOpen(false)
+    } catch (err) { alert('Falha ao exportar: ' + err.message) }
+    setBusy(false)
+  }
+
+  async function handleImport(e) {
+    const file = e.target.files[0]
+    if (!file) return
+    setBusy(true)
+    try {
+      const data = JSON.parse(await file.text())
+      await importAllData(data)
+      await flushPendingImageUploads()
+      getBoards().then(setBoards)
+      getStorageUsage().then(setUsage)
+      alert('Backup restaurado!')
+    } catch (err) { alert('Ficheiro inválido: ' + err.message) }
+    e.target.value = ''
+    setBusy(false); setBackupMenuOpen(false)
+  }
+
   return (
     <div className="screen">
       <header className="top-bar">
         <span className="app-title">RefMemo</span>
-        <button className="logout-btn" title="Sair" onClick={() => supabase.auth.signOut()}>↪</button>
+        <div className="top-bar-right">
+          <div className="storage-meter" title={`${Math.round(usage.bytes / 1048576)} MB de 150 MB`}>
+            <div className="storage-meter-track">
+              <div className="storage-meter-fill" style={{ width: `${Math.min(100, usage.ratio * 100)}%`, background: usage.ratio >= 1 ? '#e8315a' : usage.ratio >= 0.8 ? '#f5a623' : '#3bb273' }} />
+            </div>
+            <span className="storage-meter-label">{Math.round(usage.bytes / 1048576)}/150 MB</span>
+          </div>
+          <button className="logout-btn" title="Backup / Restaurar" onClick={() => setBackupMenuOpen(true)}>⋯</button>
+          <button className="logout-btn" title="Sair" onClick={() => supabase.auth.signOut()}>↪</button>
+        </div>
       </header>
 
       <Canvas onClick={handleCanvasClick} scaleRef={scaleRef} containerRef={canvasContainerRef} offsetRef={canvasOffsetRef}>
@@ -220,6 +280,40 @@ export default function HomeScreen({ onOpenBoard, session }) {
           <span>New Board</span>
         </button>
       </div>
+
+      <input ref={importRef} type="file" accept="application/json" style={{ display: 'none' }} onChange={handleImport} />
+
+      {/* Backup menu */}
+      {backupMenuOpen && (
+        <div className="modal-overlay" onClick={() => setBackupMenuOpen(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <h3 style={{ marginBottom: 4 }}>Backup</h3>
+            <div className="board-menu-list">
+              <button className="board-menu-item" disabled={busy} onClick={handleExport}>⬇︎ Exportar os meus dados</button>
+              <button className="board-menu-item" disabled={busy} onClick={() => importRef.current?.click()}>⬆︎ Restaurar de backup</button>
+            </div>
+            <p style={{ fontSize: '0.75rem', color: 'var(--muted)', marginTop: 10, lineHeight: 1.4 }}>
+              Inclui todos os boards, notas e imagens num só ficheiro. Guarda-o no teu computador.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Weekly backup reminder */}
+      {backupTip && (
+        <div className="modal-overlay" onClick={() => setBackupTip(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <h3>Faz backup dos teus dados 💾</h3>
+            <p style={{ fontSize: '0.85rem', color: 'var(--muted)', margin: '8px 0 4px', lineHeight: 1.45 }}>
+              Recomendamos exportar uma cópia dos teus boards e imagens uma vez por semana. Guarda o ficheiro no teu computador.
+            </p>
+            <div className="modal-actions" style={{ marginTop: 12 }}>
+              <button className="btn-ghost" onClick={() => setBackupTip(false)}>Mais tarde</button>
+              <button className="btn-primary" disabled={busy} onClick={handleExport}>Exportar agora</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* New board modal */}
       {showNew && (

@@ -3,11 +3,11 @@ import { supabase } from './supabase'
 import { getCachedBlob, setCachedImage, saveElement, getDB } from './db'
 
 const IMAGE_CONFIG = {
-  MAX_PX: 512,
-  TARGET_BYTES: 50 * 1024,
+  MAX_PX: 1024,
+  TARGET_BYTES: 120 * 1024,
   FORMAT: 'image/webp',
-  QUALITY_START: 0.75,
-  QUALITY_MIN: 0.55,
+  QUALITY_START: 0.8,
+  QUALITY_MIN: 0.6,
   QUALITY_STEP: 0.05,
 }
 
