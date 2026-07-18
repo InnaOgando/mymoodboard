@@ -90,6 +90,10 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
   const [childBoards, setChildBoards] = useState([])
   const [selectedId, setSelectedId] = useState(null)
   const [editingId, setEditingId] = useState(null)
+  const [selectedBoardId, setSelectedBoardId] = useState(null)
+  const [boardRename, setBoardRename] = useState(false)
+  const [boardRenameValue, setBoardRenameValue] = useState('')
+  const [boardColorOpen, setBoardColorOpen] = useState(false)
 
   const [showImagePicker, setShowImagePicker] = useState(false)
   const [dropOverCollectionId, _setDropOverCollectionId] = useState(null)
@@ -488,6 +492,34 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
     deleteBoard(id).catch(e => console.error('[removeChildBoard] deleteBoard failed:', e))
   }
 
+  function renameChildBoard(id, name) {
+    if (!name.trim()) return
+    const b = childBoardsRef.current.find(c => c.id === id)
+    if (!b) return
+    const updated = { ...b, name: name.trim() }
+    setChildBoards(prev => prev.map(c => c.id === id ? updated : c))
+    saveBoard(updated).catch(e => console.error('[renameChildBoard] saveBoard failed:', e))
+  }
+
+  function changeChildBoardColor(id, color) {
+    const b = childBoardsRef.current.find(c => c.id === id)
+    if (!b) return
+    const updated = { ...b, color }
+    setChildBoards(prev => prev.map(c => c.id === id ? updated : c))
+    saveBoard(updated).catch(e => console.error('[changeChildBoardColor] saveBoard failed:', e))
+  }
+
+  // Open/act on an object. Triggered by double-tap OR by tapping an already-
+  // selected object (reliable on touch — same pattern as boards).
+  function activateElement(el) {
+    if (el.locked) return
+    const type = normalizeType(el.type)
+    if (type === 'image') setPreviewEl(el)
+    else if (type === 'collection') setGalleryEl(el)
+    else if (type === 'link') openUrl(el.content?.url?.trim())
+    else if (['idea', 'text', 'note', 'todo'].includes(type)) setEditingId(el.id)
+  }
+
   async function handleNavAction(type) {
     const vp = getViewport()
     if (type === 'image') {
@@ -721,7 +753,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
       </header>
 
       <Canvas
-        onClick={() => { setSelectedId(null); setEditingId(null) }}
+        onClick={() => { setSelectedId(null); setEditingId(null); setSelectedBoardId(null) }}
         scaleRef={scaleRef}
         offsetRef={canvasOffsetRef}
         containerRef={canvasContainerRef}
@@ -730,15 +762,16 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
         {childBoards.map(b => (
           <DraggableCard key={b.id} x={b.x} y={b.y} scaleRef={scaleRef}
             alwaysDraggable
+            selected={selectedBoardId === b.id}
             onMove={(x, y) => moveChildBoard(b.id, x, y)}
-            onTap={() => onOpenBoard(b.id)}
+            onTap={() => {
+              if (selectedBoardId === b.id) onOpenBoard(b.id)
+              else { setSelectedBoardId(b.id); setSelectedId(null); setEditingId(null) }
+            }}
           >
-            <div className="board-icon-card">
+            <div className={`board-icon-card ${selectedBoardId === b.id ? 'selected' : ''}`}>
               <div className="board-color-dot" style={{ background: b.color || '#b3b8c0' }} />
               <div className="board-icon-name">{b.name}</div>
-              <button className="card-delete-btn"
-                onPointerDown={e => e.stopPropagation()}
-                onClick={e => { e.stopPropagation(); removeChildBoard(b.id) }}>×</button>
             </div>
           </DraggableCard>
         ))}
@@ -760,23 +793,17 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
                 dropIntoCollection(el, pendingColId)
                 return
               }
-              // Single tap: select only. Secondary actions require double-tap.
-              setSelectedId(el.id)
-              setEditingId(null)
-            }}
-            onDoubleTap={() => {
-              if (el.locked) return
-              const type = normalizeType(el.type)
-              if (type === 'image') setPreviewEl(el)
-              else if (type === 'collection') setGalleryEl(el)
-              else if (type === 'palette') {
+              // Tap to select; tap again on the already-selected object opens it
+              // (reliable on touch). Double-tap below also works.
+              if (selectedId === el.id) {
+                activateElement(el)
+              } else {
                 setSelectedId(el.id)
+                setEditingId(null)
+                setSelectedBoardId(null)
               }
-              else if (type === 'link') {
-                openUrl(el.content?.url?.trim())
-              }
-              else if (['idea', 'text', 'note', 'todo'].includes(type)) setEditingId(el.id)
             }}
+            onDoubleTap={() => activateElement(el)}
           >
             <ObjectRenderer
               el={el}
@@ -796,8 +823,25 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
         ))}
       </Canvas>
 
-      {/* Single toolbar — swaps between creation and contextual mode based on selection */}
-      {(() => {
+      {/* Board management bar when a child board is selected; else the object toolbar */}
+      {selectedBoardId ? (
+        <div className="bottom-bar board-bottom" onPointerDown={e => e.stopPropagation()}>
+          <div className="bottom-nav" style={{ justifyContent: 'space-around' }}>
+            <button className="nav-btn" onClick={() => { const b = childBoards.find(c => c.id === selectedBoardId); setBoardRenameValue(b?.name || ''); setBoardRename(true) }}>
+              <span style={{ fontSize: 18, lineHeight: 1 }}>✎</span>
+              <span className="nav-label">Rename</span>
+            </button>
+            <button className="nav-btn" onClick={() => setBoardColorOpen(true)}>
+              <span style={{ fontSize: 18, lineHeight: 1 }}>🎨</span>
+              <span className="nav-label">Color</span>
+            </button>
+            <button className="nav-btn" onClick={() => { removeChildBoard(selectedBoardId); setSelectedBoardId(null) }}>
+              <span style={{ fontSize: 18, lineHeight: 1, color: '#e05555' }}>×</span>
+              <span className="nav-label">Delete</span>
+            </button>
+          </div>
+        </div>
+      ) : (() => {
         const selEl  = selectedId ? elements.find(e => e.id === selectedId) : null
         const selType = selEl ? normalizeType(selEl.type) : null
         return (
@@ -833,6 +877,44 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
           onClose={() => setShowImagePicker(false)}
         />
       )}
+
+      {boardRename && (() => {
+        const sb = childBoards.find(b => b.id === selectedBoardId)
+        if (!sb) return null
+        return (
+          <div className="modal-overlay" onClick={() => setBoardRename(false)}>
+            <div className="modal" onClick={e => e.stopPropagation()}>
+              <h3>Rename Board</h3>
+              <form onSubmit={e => { e.preventDefault(); renameChildBoard(selectedBoardId, boardRenameValue); setBoardRename(false) }}>
+                <input autoFocus className="text-input" value={boardRenameValue} onChange={e => setBoardRenameValue(e.target.value)} />
+                <div className="modal-actions" style={{ marginTop: 12 }}>
+                  <button type="button" className="btn-ghost" onClick={() => setBoardRename(false)}>Cancel</button>
+                  <button type="submit" className="btn-primary">Save</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )
+      })()}
+
+      {boardColorOpen && (() => {
+        const sb = childBoards.find(b => b.id === selectedBoardId)
+        if (!sb) return null
+        return (
+          <div className="modal-overlay" onClick={() => setBoardColorOpen(false)}>
+            <div className="modal" onClick={e => e.stopPropagation()}>
+              <h3>Board Color</h3>
+              <div className="board-color-swatches" style={{ justifyContent: 'center', padding: '12px 0' }}>
+                {PRESET_COLORS.map(c => (
+                  <button key={c} className="board-swatch"
+                    style={{ background: c, outline: sb.color === c ? '3px solid #333' : 'none', outlineOffset: 2, width: 32, height: 32 }}
+                    onClick={() => { changeChildBoardColor(selectedBoardId, c); setBoardColorOpen(false) }} />
+                ))}
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {undoVisible && (
         <div className="undo-toast">
