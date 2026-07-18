@@ -8,7 +8,6 @@ import ObjectRenderer, { normalizeType } from './ObjectRenderer'
 import { getCollectionItems } from './objects/CollectionObject'
 import { processAndUpload, deleteImageIfOrphaned } from '../storage.js'
 import { cacheImagesInBackground } from '../ImageImportService'
-import screenshotIcon from '../assets/screenshot.svg'
 import homeIcon       from '../assets/home.svg'
 import BoardToolbar from './BoardToolbar'
 import ImagePreview from './ImagePreview'
@@ -710,14 +709,15 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
   return (
     <div className="screen">
       <header className="top-bar">
-        <button className="back-btn" onClick={onBack}>‹</button>
+        <button className="home-btn" onClick={onHome} title="Home">
+          <img src={homeIcon} alt="home" style={{ width: 20, height: 20, objectFit: 'contain' }} />
+        </button>
         <span className="board-title">{board.name}</span>
-        <button className="paste-img-btn" onClick={pasteFromClipboard} title="Add screenshot">
-          <img src={screenshotIcon} alt="screenshot" style={{ width: 22, height: 22, objectFit: 'contain' }} />
-        </button>
-        <button className="home-btn" onClick={onHome}>
-          <img src={homeIcon} alt="home" style={{ width: 22, height: 22, objectFit: 'contain' }} />
-        </button>
+        {boardStack.length > 1 ? (
+          <button className="back-btn" onClick={onBack} title="Subir um nível">‹</button>
+        ) : (
+          <span className="top-bar-spacer" />
+        )}
       </header>
 
       <Canvas
@@ -829,6 +829,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
       {showImagePicker && (
         <ImagePicker
           onFiles={files => { setShowImagePicker(false); handleFiles(files) }}
+          onPaste={() => { setShowImagePicker(false); pasteFromClipboard() }}
           onClose={() => setShowImagePicker(false)}
         />
       )}

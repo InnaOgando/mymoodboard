@@ -1,32 +1,52 @@
 import { useRef } from 'react'
-import imageIcon from '../assets/image.svg'
+import pasteIcon   from '../assets/screenshot.svg'
+import libraryIcon from '../assets/photolibrary.svg'
+import cameraIcon  from '../assets/camera.svg'
+import fileIcon    from '../assets/file.svg'
 
-export default function ImagePicker({ onFiles, onClose }) {
+const IMG = { width: 24, height: 24, objectFit: 'contain' }
+
+export default function ImagePicker({ onFiles, onPaste, onClose }) {
+  const libRef  = useRef()
+  const camRef  = useRef()
   const fileRef = useRef()
 
   function handleFiles(e) {
     const files = Array.from(e.target.files)
+    e.target.value = ''
     onClose()
     onFiles(files)
-    e.target.value = ''
   }
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal image-picker-modal" onClick={e => e.stopPropagation()}>
-        <h3>Add Image</h3>
+        <h3>Add image</h3>
 
         <div className="image-picker-options">
+          <button className="picker-option" onClick={() => onPaste?.()}>
+            <img src={pasteIcon} alt="" style={IMG} />
+            <span>Paste screenshot</span>
+          </button>
+          <button className="picker-option" onClick={() => libRef.current.click()}>
+            <img src={libraryIcon} alt="" style={IMG} />
+            <span>Photo library</span>
+          </button>
+          <button className="picker-option" onClick={() => camRef.current.click()}>
+            <img src={cameraIcon} alt="" style={IMG} />
+            <span>Take photo</span>
+          </button>
           <button className="picker-option" onClick={() => fileRef.current.click()}>
-            <img src={imageIcon} alt="Photos" style={{ width: 24, height: 24, objectFit: 'contain' }} />
-            <span>Photos / Camera</span>
+            <img src={fileIcon} alt="" style={IMG} />
+            <span>Choose file</span>
           </button>
         </div>
 
         <button className="btn-ghost" style={{ marginTop: 12, width: '100%' }} onClick={onClose}>Cancel</button>
 
-        <input ref={fileRef} type="file" accept="image/*" multiple style={{ display: 'none' }}
-          onChange={handleFiles} />
+        <input ref={libRef}  type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={handleFiles} />
+        <input ref={camRef}  type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={handleFiles} />
+        <input ref={fileRef} type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={handleFiles} />
       </div>
     </div>
   )
