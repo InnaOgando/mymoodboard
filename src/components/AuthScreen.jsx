@@ -15,18 +15,18 @@ export default function AuthScreen() {
     setLoading(true); setError('')
     const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
     setLoading(false)
-    if (error) setError('Email ou password incorretos.')
+    if (error) setError('Wrong email or password.')
   }
 
   async function handleRegister(e) {
     e.preventDefault()
-    if (password !== confirm) { setError('As passwords não coincidem.'); return }
-    if (password.length < 6) { setError('Password mínimo 6 caracteres.'); return }
+    if (password !== confirm) { setError('Passwords do not match.'); return }
+    if (password.length < 6) { setError('Password must be at least 6 characters.'); return }
     setLoading(true); setError('')
     const { error } = await supabase.auth.signUp({ email: email.trim(), password })
     setLoading(false)
     if (error) { setError(error.message); return }
-    setMessage('Conta criada! Verifica o teu email para confirmar.')
+    setMessage('Account created! Check your email to confirm.')
   }
 
   async function handleReset(e) {
@@ -37,7 +37,7 @@ export default function AuthScreen() {
     })
     setLoading(false)
     if (error) { setError(error.message); return }
-    setMessage('Email de reset enviado. Verifica a caixa de entrada.')
+    setMessage('Reset email sent. Check your inbox.')
   }
 
   function switchMode(m) { setMode(m); setError(''); setMessage('') }
@@ -52,13 +52,13 @@ export default function AuthScreen() {
         {message ? (
           <div className="auth-message">
             <p>{message}</p>
-            <button className="auth-resend" onClick={() => setMessage('')}>Voltar</button>
+            <button className="auth-resend" onClick={() => setMessage('')}>Back</button>
           </div>
         ) : (
           <>
             <div className="auth-tabs">
-              <button className={`auth-tab ${mode === 'login' ? 'active' : ''}`} onClick={() => switchMode('login')}>Entrar</button>
-              <button className={`auth-tab ${mode === 'register' ? 'active' : ''}`} onClick={() => switchMode('register')}>Registar</button>
+              <button className={`auth-tab ${mode === 'login' ? 'active' : ''}`} onClick={() => switchMode('login')}>Log in</button>
+              <button className={`auth-tab ${mode === 'register' ? 'active' : ''}`} onClick={() => switchMode('register')}>Sign up</button>
             </div>
 
             <form className="auth-form" onSubmit={mode === 'login' ? handleLogin : mode === 'register' ? handleRegister : handleReset}>
@@ -71,22 +71,22 @@ export default function AuthScreen() {
               )}
 
               {mode === 'register' && (
-                <input className="auth-input" type="password" placeholder="Confirmar password" value={confirm}
+                <input className="auth-input" type="password" placeholder="Confirm password" value={confirm}
                   onChange={e => setConfirm(e.target.value)} required />
               )}
 
               {error && <p className="auth-error">{error}</p>}
 
               <button className="auth-btn" type="submit" disabled={loading}>
-                {loading ? '…' : mode === 'login' ? 'Entrar' : mode === 'register' ? 'Criar conta' : 'Enviar reset'}
+                {loading ? '…' : mode === 'login' ? 'Log in' : mode === 'register' ? 'Create account' : 'Send reset'}
               </button>
             </form>
 
             {mode === 'login' && (
-              <button className="auth-link" onClick={() => switchMode('reset')}>Esqueci a password</button>
+              <button className="auth-link" onClick={() => switchMode('reset')}>Forgot password</button>
             )}
             {mode === 'reset' && (
-              <button className="auth-link" onClick={() => switchMode('login')}>Voltar ao login</button>
+              <button className="auth-link" onClick={() => switchMode('login')}>Back to login</button>
             )}
           </>
         )}

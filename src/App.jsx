@@ -24,15 +24,15 @@ function PasswordResetScreen({ onDone }) {
 
   async function handleSubmit(e) {
     e.preventDefault()
-    if (password.length < 6) { setMsg('Password tem de ter pelo menos 6 caracteres.'); return }
-    if (password !== confirm) { setMsg('Passwords não coincidem.'); return }
+    if (password.length < 6) { setMsg('Password must be at least 6 characters.'); return }
+    if (password !== confirm) { setMsg('Passwords do not match.'); return }
     setLoading(true)
     const { error } = await supabase.auth.updateUser({ password })
     setLoading(false)
     if (error) {
       setMsg(error.message)
     } else {
-      setMsg('Password atualizada! A entrar…')
+      setMsg('Password updated! Signing in…')
       // Clear recovery flag and let normal auth flow take over after a short delay
       setTimeout(() => onDone(), 1500)
     }
@@ -42,15 +42,15 @@ function PasswordResetScreen({ onDone }) {
     <div className="auth-screen">
       <div className="auth-card">
         <div className="auth-title">RefMemo</div>
-        <h3 style={{ marginBottom: 16 }}>Nova Password</h3>
+        <h3 style={{ marginBottom: 16 }}>New password</h3>
         <form onSubmit={handleSubmit}>
-          <input className="auth-input" type="password" placeholder="Nova password" value={password}
+          <input className="auth-input" type="password" placeholder="New password" value={password}
             onChange={e => setPassword(e.target.value)} autoFocus />
-          <input className="auth-input" type="password" placeholder="Confirmar password" value={confirm}
+          <input className="auth-input" type="password" placeholder="Confirm password" value={confirm}
             onChange={e => setConfirm(e.target.value)} />
           {msg && <div className="auth-message">{msg}</div>}
           <button className="auth-btn" type="submit" disabled={loading}>
-            {loading ? '…' : 'Guardar password'}
+            {loading ? '…' : 'Save password'}
           </button>
         </form>
       </div>

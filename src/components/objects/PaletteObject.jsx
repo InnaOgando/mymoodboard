@@ -5,7 +5,7 @@ import ResizeHandle from '../ResizeHandle'
 export function getPaletteColors(content) {
   if (content.colors && content.colors.length > 0) return content.colors
   if (content.color) return [content.color]
-  return ['#e8315a']
+  return ['#b3b8c0']
 }
 
 function isLightColor(hex) {

@@ -209,7 +209,7 @@ export default function HomeScreen({ onOpenBoard, session }) {
       setTimeout(() => URL.revokeObjectURL(url), 8000)
       localStorage.setItem('refmemo_last_backup', String(Date.now()))
       setBackupTip(false); setBackupMenuOpen(false)
-    } catch (err) { alert('Falha ao exportar: ' + err.message) }
+    } catch (err) { alert('Export failed: ' + err.message) }
     setBusy(false)
   }
 
@@ -223,8 +223,8 @@ export default function HomeScreen({ onOpenBoard, session }) {
       await flushPendingImageUploads()
       getBoards().then(setBoards)
       getStorageUsage().then(setUsage)
-      alert('Backup restaurado!')
-    } catch (err) { alert('Ficheiro inválido: ' + err.message) }
+      alert('Backup restored!')
+    } catch (err) { alert('Invalid file: ' + err.message) }
     e.target.value = ''
     setBusy(false); setBackupMenuOpen(false)
   }
@@ -234,14 +234,14 @@ export default function HomeScreen({ onOpenBoard, session }) {
       <header className="top-bar">
         <span className="app-title">RefMemo</span>
         <div className="top-bar-right">
-          <div className="storage-meter" title={`${Math.round(usage.bytes / 1048576)} MB de 150 MB`}>
+          <div className="storage-meter" title={`${Math.round(usage.bytes / 1048576)} MB of 150 MB`}>
             <div className="storage-meter-track">
               <div className="storage-meter-fill" style={{ width: `${Math.min(100, usage.ratio * 100)}%`, background: usage.ratio >= 1 ? '#e8315a' : usage.ratio >= 0.8 ? '#f5a623' : '#3bb273' }} />
             </div>
             <span className="storage-meter-label">{Math.round(usage.bytes / 1048576)}/150 MB</span>
           </div>
-          <button className="logout-btn" title="Backup / Restaurar" onClick={() => setBackupMenuOpen(true)}>⋯</button>
-          <button className="logout-btn" title="Sair" onClick={() => supabase.auth.signOut()}>↪</button>
+          <button className="logout-btn" title="Backup / Restore" onClick={() => setBackupMenuOpen(true)}>⋯</button>
+          <button className="logout-btn" title="Sign out" onClick={() => supabase.auth.signOut()}>↪</button>
         </div>
       </header>
 
@@ -260,7 +260,7 @@ export default function HomeScreen({ onOpenBoard, session }) {
             }}
           >
             <div className={`board-icon-card ${selectedId === board.id ? 'selected' : ''}`}>
-              <div className="board-color-dot" style={{ background: board.color || '#e8315a' }} />
+              <div className="board-color-dot" style={{ background: board.color || '#b3b8c0' }} />
               <div className="board-icon-name">{board.name}</div>
             </div>
           </DraggableCard>
@@ -289,11 +289,11 @@ export default function HomeScreen({ onOpenBoard, session }) {
           <div className="modal" onClick={e => e.stopPropagation()}>
             <h3 style={{ marginBottom: 4 }}>Backup</h3>
             <div className="board-menu-list">
-              <button className="board-menu-item" disabled={busy} onClick={handleExport}>⬇︎ Exportar os meus dados</button>
-              <button className="board-menu-item" disabled={busy} onClick={() => importRef.current?.click()}>⬆︎ Restaurar de backup</button>
+              <button className="board-menu-item" disabled={busy} onClick={handleExport}>⬇︎ Export my data</button>
+              <button className="board-menu-item" disabled={busy} onClick={() => importRef.current?.click()}>⬆︎ Restore from backup</button>
             </div>
             <p style={{ fontSize: '0.75rem', color: 'var(--muted)', marginTop: 10, lineHeight: 1.4 }}>
-              Inclui todos os boards, notas e imagens num só ficheiro. Guarda-o no teu computador.
+              Includes all your boards, notes and images in a single file. Save it on your computer.
             </p>
           </div>
         </div>
@@ -303,13 +303,13 @@ export default function HomeScreen({ onOpenBoard, session }) {
       {backupTip && (
         <div className="modal-overlay" onClick={() => setBackupTip(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
-            <h3>Faz backup dos teus dados 💾</h3>
+            <h3>Back up your data 💾</h3>
             <p style={{ fontSize: '0.85rem', color: 'var(--muted)', margin: '8px 0 4px', lineHeight: 1.45 }}>
-              Recomendamos exportar uma cópia dos teus boards e imagens uma vez por semana. Guarda o ficheiro no teu computador.
+              We recommend exporting a copy of your boards and images once a week. Save the file on your computer.
             </p>
             <div className="modal-actions" style={{ marginTop: 12 }}>
-              <button className="btn-ghost" onClick={() => setBackupTip(false)}>Mais tarde</button>
-              <button className="btn-primary" disabled={busy} onClick={handleExport}>Exportar agora</button>
+              <button className="btn-ghost" onClick={() => setBackupTip(false)}>Later</button>
+              <button className="btn-primary" disabled={busy} onClick={handleExport}>Export now</button>
             </div>
           </div>
         </div>

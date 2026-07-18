@@ -650,7 +650,7 @@ body {
 .board-menu-danger:hover { background: rgba(224,85,85,0.06); }
 
 .board-bottom {
-  padding: 6px 8px 10px;
+  padding: 2px 6px 5px;
 }
 
 .bottom-nav {
@@ -668,15 +668,15 @@ body {
   background: none;
   border: none;
   cursor: pointer;
-  padding: 6px 8px;
+  padding: 3px 6px;
   border-radius: 8px;
-  min-width: 44px;
+  min-width: 40px;
   color: var(--text);
 }
 .nav-btn:hover { background: var(--border-light); }
 .nav-icon { font-size: 1.1rem; line-height: 1; }
-.nav-icon-img { width: 22px; height: 22px; object-fit: contain; display: block; margin: 0 auto; }
-.nav-label { font-size: 0.62rem; color: var(--muted); }
+.nav-icon-img { width: 18px; height: 18px; object-fit: contain; display: block; margin: 0 auto; }
+.nav-label { font-size: 0.6rem; color: var(--muted); }
 
 /* Center board button */
 .add-board-btn {
@@ -698,9 +698,15 @@ body {
 .add-board-icon { font-size: 1.2rem; line-height: 1; }
 
 .center-btn {
-  padding: 6px 12px;
-  border-radius: 20px;
+  padding: 4px 10px;
+  border-radius: 18px;
 }
+.add-board-btn.center-btn {
+  background: #e6e6e6;
+  color: var(--text);
+  box-shadow: none;
+}
+.add-board-btn.center-btn:hover { background: #dcdcdc; }
 
 /* ── Image picker ── */
 .image-picker-options {

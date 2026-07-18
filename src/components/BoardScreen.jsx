@@ -10,6 +10,9 @@ import { processAndUpload, deleteImageIfOrphaned } from '../storage.js'
 import { cacheImagesInBackground } from '../ImageImportService'
 import homeIcon       from '../assets/home.svg'
 import BoardToolbar from './BoardToolbar'
+import { PRESET_COLORS } from '../colors'
+
+const randomColor = () => PRESET_COLORS[Math.floor(Math.random() * PRESET_COLORS.length)]
 import ImagePreview from './ImagePreview'
 import CollectionGallery from './CollectionGallery'
 
@@ -175,7 +178,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
       if (el) logPlacement(source, vp, pos, el)
       const after = await getStorageUsage()
       if (after.ratio >= 0.8) {
-        setStorageMsg(`Já usaste ${Math.round(after.bytes / 1048576)} MB de 150 MB.`)
+        setStorageMsg(`You've used ${Math.round(after.bytes / 1048576)} MB of 150 MB.`)
         setTimeout(() => setStorageMsg(null), 5000)
       }
     } catch (err) {
@@ -495,7 +498,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
       const bPos = findFreePosition(elementsRef.current, childBoardsRef.current, vp, 148, 130)
       const newBoard = {
         id: uid(), parentId: boardId, name: name.trim(),
-        color: '#e8315a',
+        color: randomColor(),
         x: bPos.x, y: bPos.y, createdAt: Date.now()
       }
       setChildBoards(prev => [...prev, newBoard])
@@ -505,7 +508,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
     } else if (type === 'palette') {
       const freePos = findFreePosition(elementsRef.current, childBoardsRef.current, vp, 200, 90)
       await addElement('palette', freePos, {
-        colors: ['#e8315a']
+        colors: [randomColor()]
       })
     } else {
       const freePos = findFreePosition(elementsRef.current, childBoardsRef.current, vp)
@@ -699,8 +702,8 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
       const data = JSON.parse(await file.text())
       await importAllData(data)
       await load()
-      alert('Backup restaurado!')
-    } catch { alert('Ficheiro inválido.') }
+      alert('Backup restored!')
+    } catch { alert('Invalid file.') }
     e.target.value = ''
   }
 
@@ -714,7 +717,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
         </button>
         <span className="board-title">{board.name}</span>
         {boardStack.length > 1 ? (
-          <button className="back-btn" onClick={onBack} title="Subir um nível">‹</button>
+          <button className="back-btn" onClick={onBack} title="Back">‹</button>
         ) : (
           <span className="top-bar-spacer" />
         )}
@@ -734,7 +737,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
             onTap={() => onOpenBoard(b.id)}
           >
             <div className="board-icon-card">
-              <div className="board-color-dot" style={{ background: b.color || '#e8315a' }} />
+              <div className="board-color-dot" style={{ background: b.color || '#b3b8c0' }} />
               <div className="board-icon-name">{b.name}</div>
               <button className="card-delete-btn"
                 onPointerDown={e => e.stopPropagation()}
