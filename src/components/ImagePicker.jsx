@@ -2,14 +2,12 @@ import { useRef } from 'react'
 import pasteIcon   from '../assets/screenshot.svg'
 import libraryIcon from '../assets/photolibrary.svg'
 import cameraIcon  from '../assets/camera.svg'
-import fileIcon    from '../assets/file.svg'
 
 const IMG = { width: 24, height: 24, objectFit: 'contain' }
 
 export default function ImagePicker({ onFiles, onPaste, onClose }) {
-  const libRef  = useRef()
-  const camRef  = useRef()
-  const fileRef = useRef()
+  const libRef = useRef()
+  const camRef = useRef()
 
   function handleFiles(e) {
     const files = Array.from(e.target.files)
@@ -36,17 +34,12 @@ export default function ImagePicker({ onFiles, onPaste, onClose }) {
             <img src={cameraIcon} alt="" style={IMG} />
             <span>Take photo</span>
           </button>
-          <button className="picker-option" onClick={() => fileRef.current.click()}>
-            <img src={fileIcon} alt="" style={IMG} />
-            <span>Choose file</span>
-          </button>
         </div>
 
         <button className="btn-ghost" style={{ marginTop: 12, width: '100%' }} onClick={onClose}>Cancel</button>
 
-        <input ref={libRef}  type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={handleFiles} />
-        <input ref={camRef}  type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={handleFiles} />
-        <input ref={fileRef} type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={handleFiles} />
+        <input ref={libRef} type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={handleFiles} />
+        <input ref={camRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={handleFiles} />
       </div>
     </div>
   )

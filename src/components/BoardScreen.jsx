@@ -166,7 +166,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
     try {
       const usage = await getStorageUsage()
       if (usage.bytes >= usage.limit) {
-        setStorageMsg('Storage cheio (150 MB). Apaga imagens para adicionar mais.')
+        setStorageMsg('Storage full (150 MB). Delete images to add more.')
         setTimeout(() => setStorageMsg(null), 6000)
         return
       }
@@ -580,7 +580,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
 
     const preUsage = await getStorageUsage()
     if (preUsage.bytes >= preUsage.limit) {
-      setStorageMsg('Storage cheio (150 MB). Apaga imagens para adicionar mais.')
+      setStorageMsg('Storage full (150 MB). Delete images to add more.')
       setTimeout(() => setStorageMsg(null), 6000)
       return
     }
@@ -660,7 +660,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
   }
 
   async function pasteFromClipboard() {
-    console.log('[placement] pasteFromClipboard triggered')
+    const notify = (m) => { setStorageMsg(m); setTimeout(() => setStorageMsg(null), 3000) }
     if (location.protocol === 'https:' && navigator.clipboard?.read) {
       try {
         const items = await navigator.clipboard.read()
@@ -672,16 +672,13 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
             return
           }
         }
-        console.log('[placement] pasteFromClipboard → no image in clipboard, opening file picker')
-        fileRef.current.click()
+        notify('No image in clipboard. Copy a screenshot first.')
       } catch (err) {
-        console.log('[placement] pasteFromClipboard → clipboard.read failed:', err?.name, '→ file picker')
-        fileRef.current.click()
+        notify('Could not read the clipboard.')
       }
       return
     }
-    console.log('[placement] pasteFromClipboard → no clipboard API, opening file picker')
-    fileRef.current.click()
+    notify('Clipboard not available on this browser.')
   }
 
   async function handleExport() {
