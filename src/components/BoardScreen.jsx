@@ -836,8 +836,8 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
 
       {undoVisible && (
         <div className="undo-toast">
-          <span>Item apagado</span>
-          <button className="undo-btn" onClick={undo}>Desfazer</button>
+          <span>Item deleted</span>
+          <button className="undo-btn" onClick={undo}>Undo</button>
           <button className="undo-close" onPointerDown={e => e.stopPropagation()} onClick={() => setUndoVisible(false)}>×</button>
         </div>
       )}

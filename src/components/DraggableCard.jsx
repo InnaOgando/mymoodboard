@@ -2,7 +2,6 @@ import { useRef } from 'react'
 
 const INTERACTIVE = new Set(['INPUT', 'TEXTAREA', 'SELECT', 'A'])
 const DOUBLE_TAP_MS = 500
-const DOUBLE_TAP_DIST = 40
 
 export default function DraggableCard({
   x, y, scaleRef, onMove, onTap, onDoubleTap, onDragStart, onDragMove, onDragEnd,
@@ -18,7 +17,6 @@ export default function DraggableCard({
   const longTimer = useRef(null)
   const savedPointerId = useRef(null)
   const lastTapDown = useRef(0)
-  const lastTapPos = useRef({ x: 0, y: 0 })
   const curDownTime = useRef(0)
 
   function cancelLong() {
@@ -133,18 +131,15 @@ export default function DraggableCard({
     if (moved.current && isDragging.current) {
       onDragEnd?.(lastPos.current.x, lastPos.current.y)
     } else if (!moved.current) {
-      // Double-tap: two quick taps close together. Measured DOWN-to-DOWN
-      // (far more reliable on touch than lift-to-lift) with a small position window.
-      const dx = startPointer.current.x - lastTapPos.current.x
-      const dy = startPointer.current.y - lastTapPos.current.y
-      const near = (dx * dx + dy * dy) < DOUBLE_TAP_DIST * DOUBLE_TAP_DIST
-      const isDoubleTap = (curDownTime.current - lastTapDown.current) < DOUBLE_TAP_MS && near
+      // Double-tap: two quick taps on THIS card. The handler is per-card, so both
+      // taps are already on the same element — no position check needed. Measured
+      // DOWN-to-DOWN, far more reliable on touch than lift-to-lift.
+      const isDoubleTap = (curDownTime.current - lastTapDown.current) < DOUBLE_TAP_MS
       if (isDoubleTap) {
         lastTapDown.current = 0  // consume, so a 3rd tap starts fresh
         onDoubleTap?.()
       } else {
         lastTapDown.current = curDownTime.current
-        lastTapPos.current = { x: startPointer.current.x, y: startPointer.current.y }
         onTap?.()
       }
     }
