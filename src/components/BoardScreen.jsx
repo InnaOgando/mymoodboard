@@ -92,6 +92,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
   const [editingId, setEditingId] = useState(null)
   const [selectMode, setSelectMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState([])
+  const [selectedBoardIds, setSelectedBoardIds] = useState([])
   const [selectedBoardId, setSelectedBoardId] = useState(null)
   const [boardRename, setBoardRename] = useState(false)
   const [boardRenameValue, setBoardRenameValue] = useState('')
@@ -115,6 +116,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
   // Refs mirror select-mode state for synchronous reads inside drag handlers
   const selectModeRef = useRef(false)
   const selectedIdsRef = useRef([])
+  const selectedBoardIdsRef = useRef([])
   const groupDragRef = useRef(null)
 
   const undoTimer = useRef(null)
@@ -143,6 +145,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
   useEffect(() => { childBoardsRef.current = childBoards }, [childBoards])
   useEffect(() => { selectModeRef.current = selectMode }, [selectMode])
   useEffect(() => { selectedIdsRef.current = selectedIds }, [selectedIds])
+  useEffect(() => { selectedBoardIdsRef.current = selectedBoardIds }, [selectedBoardIds])
   useEffect(() => { load() }, [boardId])
 
   function getViewport() {
@@ -489,74 +492,108 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
     return null
   }
 
-  function handleObjectDragStart(objectEl) {
+  function handleObjectDragStart(item) {
     buildCollectionHeightsCache()
-    // Select mode: if dragging one of the selected objects, snapshot the whole
-    // group's start positions so they all move together by the same delta.
-    if (selectModeRef.current && objectEl && selectedIdsRef.current.includes(objectEl.id)) {
+    const isBoard = !!item.isBoard
+    const anchorSelected = isBoard
+      ? selectedBoardIdsRef.current.includes(item.id)
+      : selectedIdsRef.current.includes(item.id)
+    // Select mode: if dragging a selected item, snapshot the whole group's start
+    // positions (objects AND boards) so they all move together by the same delta.
+    if (selectModeRef.current && anchorSelected) {
       const starts = {}
       for (const it of elementsRef.current) {
-        if (selectedIdsRef.current.includes(it.id)) starts[it.id] = { x: it.x, y: it.y }
+        if (selectedIdsRef.current.includes(it.id)) starts[it.id] = { x: it.x, y: it.y, isBoard: false }
       }
-      groupDragRef.current = { anchorId: objectEl.id, anchor: { x: objectEl.x, y: objectEl.y }, starts }
+      for (const b of childBoardsRef.current) {
+        if (selectedBoardIdsRef.current.includes(b.id)) starts[b.id] = { x: b.x, y: b.y, isBoard: true }
+      }
+      groupDragRef.current = {
+        anchorId: item.id,
+        anchor: { x: item.x, y: item.y },
+        starts,
+        hasBoards: selectedBoardIdsRef.current.length > 0,
+      }
     } else {
       groupDragRef.current = null
     }
   }
 
-  function handleObjectDragMove(objectEl, nx, ny) {
-    const isCol = normalizeType(objectEl.type) === 'collection'
-    // Move the rest of the selected group by the same delta as the dragged anchor.
+  function handleObjectDragMove(item, nx, ny) {
+    const isBoard = !!item.isBoard
+    const isCol = !isBoard && normalizeType(item.type) === 'collection'
+    // Move the rest of the selected group (objects AND boards) by the same delta.
     const g = groupDragRef.current
-    if (g && g.anchorId === objectEl.id) {
+    if (g && g.anchorId === item.id) {
       const dx = nx - g.anchor.x
       const dy = ny - g.anchor.y
       setElements(prev => prev.map(el => {
-        if (el.id === objectEl.id) return el
+        if (el.id === item.id) return el
         const st = g.starts[el.id]
-        return st ? { ...el, x: st.x + dx, y: st.y + dy } : el
+        return (st && !st.isBoard) ? { ...el, x: st.x + dx, y: st.y + dy } : el
+      }))
+      setChildBoards(prev => prev.map(b => {
+        if (b.id === item.id) return b
+        const st = g.starts[b.id]
+        return (st && st.isBoard) ? { ...b, x: st.x + dx, y: st.y + dy } : b
       }))
     }
-    const cx = nx + (objectEl.w || 150) / 2
-    const cy = ny + (objectEl.h || 150) / 2
+    // Collection/board drop targets: only for an element anchor whose group has
+    // no boards (boards can't be dropped into a collection).
+    if (isBoard || (g && g.hasBoards)) {
+      setDropOverCollectionId(null)
+      setDropOverBoardId(null)
+      return
+    }
+    const cx = nx + (item.w || 150) / 2
+    const cy = ny + (item.h || 150) / 2
     const colId = isCol ? null : hitTestCollection(cx, cy)
-    setDropOverCollectionId(colId && colId !== objectEl.id ? colId : null)
-    // Also allow dropping into a child board (only when not over a collection)
+    setDropOverCollectionId(colId && colId !== item.id ? colId : null)
     const boardHit = colId ? null : hitTestChildBoard(cx, cy)
     setDropOverBoardId(boardHit)
   }
 
-  async function handleObjectDragEnd(objectEl, nx, ny) {
+  async function handleObjectDragEnd(item, nx, ny) {
     setDropOverCollectionId(null)
     setDropOverBoardId(null)
     const g = groupDragRef.current
-    const isCol = normalizeType(objectEl.type) === 'collection'
-    const cx = nx + (objectEl.w || 150) / 2
-    const cy = ny + (objectEl.h || 150) / 2
-    const colId = isCol ? null : hitTestCollection(cx, cy)
-    const boardHit = colId ? null : hitTestChildBoard(cx, cy)
+    const isBoard = !!item.isBoard
+    const isCol = !isBoard && normalizeType(item.type) === 'collection'
     collectionHeightsCache.current = {}
-    // Group drag (select mode): the dragged object is part of the selection.
-    if (g && g.anchorId === objectEl.id) {
+
+    // Group drag (select mode): the dragged item is part of the selection.
+    if (g && g.anchorId === item.id) {
       groupDragRef.current = null
-      if (colId && colId !== objectEl.id) {
-        await dropSelectedIntoCollection(colId)
-      } else if (boardHit) {
-        await dropSelectedIntoBoard(boardHit)
-      } else {
-        // Dropped on empty canvas → tidy the selection into a 3-column grid
-        arrangeSelectedIntoGrid(nx, ny, g)
+      // Collection/board drop only for a pure-object group with an object anchor.
+      if (!isBoard && !g.hasBoards) {
+        const cx = nx + (item.w || 150) / 2
+        const cy = ny + (item.h || 150) / 2
+        const colId = isCol ? null : hitTestCollection(cx, cy)
+        const boardHit = colId ? null : hitTestChildBoard(cx, cy)
+        if (colId && colId !== item.id) { await dropSelectedIntoCollection(colId); return }
+        if (boardHit) { await dropSelectedIntoBoard(boardHit); return }
       }
+      // Otherwise tidy the whole selection (objects + boards) into a grid.
+      arrangeSelectedIntoGrid(nx, ny, g)
       return
     }
-    if (colId && colId !== objectEl.id) { await dropIntoCollection(objectEl, colId); return }
-    if (boardHit) { await dropIntoBoard(objectEl, boardHit); return }
+
+    // Single (non-group) object drag → drop into collection/board.
+    if (!isBoard) {
+      const cx = nx + (item.w || 150) / 2
+      const cy = ny + (item.h || 150) / 2
+      const colId = isCol ? null : hitTestCollection(cx, cy)
+      const boardHit = colId ? null : hitTestChildBoard(cx, cy)
+      if (colId && colId !== item.id) { await dropIntoCollection(item, colId); return }
+      if (boardHit) { await dropIntoBoard(item, boardHit); return }
+    }
   }
 
   // ── Multi-select (select mode) ──────────────────────────────────────────────
   function enterSelectMode() {
     setSelectMode(true)
     setSelectedIds([])
+    setSelectedBoardIds([])
     setSelectedId(null)
     setEditingId(null)
     setSelectedBoardId(null)
@@ -564,14 +601,25 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
   function exitSelectMode() {
     setSelectMode(false)
     setSelectedIds([])
+    setSelectedBoardIds([])
   }
   function toggleSelectId(id) {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
   }
+  function toggleSelectBoardId(id) {
+    setSelectedBoardIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+  }
   async function deleteSelected() {
     const ids = [...selectedIdsRef.current]
+    const bids = [...selectedBoardIdsRef.current]
+    if (bids.length && !confirm(`Delete ${bids.length} board(s) and everything inside?`)) return
     setSelectedIds([])
+    setSelectedBoardIds([])
     for (const id of ids) await removeElement(id)
+    for (const id of bids) {
+      setChildBoards(prev => prev.filter(b => b.id !== id))
+      deleteBoard(id).catch(e => console.error('[deleteSelected] deleteBoard failed:', e))
+    }
   }
   async function dropSelectedIntoCollection(colId) {
     const col = elementsRef.current.find(e => e.id === colId)
@@ -618,38 +666,55 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
   function arrangeSelectedIntoGrid(anchorNx, anchorNy, g) {
     const COLS = 3
     const GAP = 24
-    const ids = selectedIdsRef.current
-    const movers = elementsRef.current.filter(e => ids.includes(e.id))
-    if (!movers.length) return
+    const elIds = selectedIdsRef.current
+    const bdIds = selectedBoardIdsRef.current
+    const all = [
+      ...elementsRef.current.filter(e => elIds.includes(e.id)).map(m => ({ ref: m, isBoard: false, w: m.w || 150, h: m.h || 150 })),
+      ...childBoardsRef.current.filter(b => bdIds.includes(b.id)).map(b => ({ ref: b, isBoard: true, w: 180, h: 150 })),
+    ]
+    if (!all.length) return
     const dx = anchorNx - g.anchor.x
     const dy = anchorNy - g.anchor.y
     // Single item: nothing to tidy — just persist its move.
-    if (movers.length < 2) {
-      const m = movers[0]
-      const st = g.starts[m.id]
-      if (st) saveElement({ ...m, x: st.x + dx, y: st.y + dy })
-        .catch(e => console.error('[arrange] saveElement failed:', e))
+    if (all.length < 2) {
+      const only = all[0]
+      const st = g.starts[only.ref.id]
+      if (st) {
+        const moved = { ...only.ref, x: st.x + dx, y: st.y + dy }
+        if (only.isBoard) saveBoard(moved).catch(e => console.error('[arrange] saveBoard failed:', e))
+        else saveElement(moved).catch(e => console.error('[arrange] saveElement failed:', e))
+      }
       return
     }
     // Order by current (dragged) reading order: top-to-bottom, left-to-right.
-    const withPos = movers.map(m => {
-      const st = g.starts[m.id]
-      return { m, cx: st ? st.x + dx : m.x, cy: st ? st.y + dy : m.y }
+    const withPos = all.map(m => {
+      const st = g.starts[m.ref.id]
+      return { ...m, cx: st ? st.x + dx : m.ref.x, cy: st ? st.y + dy : m.ref.y }
     })
     withPos.sort((a, b) => (a.cy - b.cy) || (a.cx - b.cx))
-    const cellW = Math.max(...movers.map(m => m.w || 150)) + GAP
-    const cellH = Math.max(...movers.map(m => m.h || 150)) + GAP
+    const cellW = Math.max(...all.map(m => m.w)) + GAP
+    const cellH = Math.max(...all.map(m => m.h)) + GAP
     const originX = Math.min(...withPos.map(p => p.cx))
     const originY = Math.min(...withPos.map(p => p.cy))
-    const updated = withPos.map((p, i) => {
+    const updEls = [], updBds = []
+    withPos.forEach((p, i) => {
       const col = i % COLS
       const row = Math.floor(i / COLS)
-      return { ...p.m, x: originX + col * cellW, y: originY + row * cellH }
+      const moved = { ...p.ref, x: originX + col * cellW, y: originY + row * cellH }
+      if (p.isBoard) updBds.push(moved); else updEls.push(moved)
     })
-    const byId = new Map(updated.map(u => [u.id, u]))
-    setElements(prev => prev.map(e => byId.get(e.id) || e))
-    updated.forEach(u => saveElement(u).catch(e => console.error('[arrange] saveElement failed:', e)))
+    if (updEls.length) {
+      const byId = new Map(updEls.map(u => [u.id, u]))
+      setElements(prev => prev.map(e => byId.get(e.id) || e))
+      updEls.forEach(u => saveElement(u).catch(e => console.error('[arrange] saveElement failed:', e)))
+    }
+    if (updBds.length) {
+      const byId = new Map(updBds.map(u => [u.id, u]))
+      setChildBoards(prev => prev.map(b => byId.get(b.id) || b))
+      updBds.forEach(u => saveBoard(u).catch(e => console.error('[arrange] saveBoard failed:', e)))
+    }
     setSelectedIds([])
+    setSelectedBoardIds([])
   }
 
   async function removeChildBoard(id) {
@@ -932,15 +997,20 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
         {childBoards.map(b => (
           <DraggableCard key={b.id} x={b.x} y={b.y} scaleRef={scaleRef}
             alwaysDraggable
-            selected={selectedBoardId === b.id}
+            selected={selectMode ? selectedBoardIds.includes(b.id) : selectedBoardId === b.id}
+            checked={selectMode && selectedBoardIds.includes(b.id)}
             onMove={(x, y) => moveChildBoard(b.id, x, y)}
+            onDragStart={() => handleObjectDragStart({ id: b.id, x: b.x, y: b.y, isBoard: true })}
+            onDragMove={(nx, ny) => handleObjectDragMove({ id: b.id, x: b.x, y: b.y, isBoard: true }, nx, ny)}
+            onDragEnd={(nx, ny) => handleObjectDragEnd({ id: b.id, x: b.x, y: b.y, isBoard: true }, nx, ny)}
             onTap={() => {
+              if (selectMode) { toggleSelectBoardId(b.id); return }
               if (selectedBoardId === b.id) onOpenBoard(b.id)
               else { setSelectedBoardId(b.id); setSelectedId(null); setEditingId(null) }
             }}
           >
             <div
-              className={`board-icon-card board-icon-card--child ${selectedBoardId === b.id ? 'selected' : ''} ${dropOverBoardId === b.id ? 'drop-target' : ''}`}
+              className={`board-icon-card board-icon-card--child ${(selectMode ? selectedBoardIds.includes(b.id) : selectedBoardId === b.id) ? 'selected' : ''} ${dropOverBoardId === b.id ? 'drop-target' : ''}`}
               style={{ background: b.color || '#b3b8c0', color: readableTextColor(b.color || '#b3b8c0') }}
             >
               <div className="board-icon-name">{b.name}</div>
@@ -1032,7 +1102,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
             selectedEl={selEl}
             selectedType={selType}
             selectMode={selectMode}
-            selectedCount={selectedIds.length}
+            selectedCount={selectedIds.length + selectedBoardIds.length}
             onEnterSelect={enterSelectMode}
             onExitSelect={exitSelectMode}
             onDeleteSelected={deleteSelected}

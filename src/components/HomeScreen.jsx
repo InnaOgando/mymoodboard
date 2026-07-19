@@ -190,11 +190,21 @@ export default function HomeScreen({ onOpenBoard, session }) {
   const [busy, setBusy] = useState(false)
   const importRef = useRef()
 
-  // Weekly nudge: prompt a backup if it's been over 7 days (or never).
+  // Backup nudge: show if it's been over 7 days since the last backup (or never),
+  // UNLESS the user dismissed it recently (snoozed for two weeks).
   useEffect(() => {
     const last = Number(localStorage.getItem('refmemo_last_backup') || 0)
-    if (!last || (Date.now() - last) / 86400000 >= 7) setBackupTip(true)
+    const snoozeUntil = Number(localStorage.getItem('refmemo_backup_snooze_until') || 0)
+    const dueForBackup = !last || (Date.now() - last) / 86400000 >= 7
+    const snoozed = Date.now() < snoozeUntil
+    if (dueForBackup && !snoozed) setBackupTip(true)
   }, [])
+
+  // Dismissing the nudge snoozes it for two weeks.
+  function dismissBackupTip() {
+    localStorage.setItem('refmemo_backup_snooze_until', String(Date.now() + 14 * 86400000))
+    setBackupTip(false)
+  }
 
   async function handleExport() {
     setBusy(true)
@@ -301,14 +311,14 @@ export default function HomeScreen({ onOpenBoard, session }) {
 
       {/* Weekly backup reminder */}
       {backupTip && (
-        <div className="modal-overlay" onClick={() => setBackupTip(false)}>
+        <div className="modal-overlay" onClick={dismissBackupTip}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <h3>Back up your data 💾</h3>
             <p style={{ fontSize: '0.85rem', color: 'var(--muted)', margin: '8px 0 4px', lineHeight: 1.45 }}>
               We recommend exporting a copy of your boards and images once a week. Save the file on your computer.
             </p>
             <div className="modal-actions" style={{ marginTop: 12 }}>
-              <button className="btn-ghost" onClick={() => setBackupTip(false)}>Later</button>
+              <button className="btn-ghost" onClick={dismissBackupTip}>Later</button>
               <button className="btn-primary" disabled={busy} onClick={handleExport}>Export now</button>
             </div>
           </div>
