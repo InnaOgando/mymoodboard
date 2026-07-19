@@ -33,9 +33,32 @@ const CREATE_RIGHT = [
  *
  * key={selectedId || 'create'} in the parent resets panel state on selection change.
  */
-export default function BoardToolbar({ selectedEl, selectedType, onAction, ...actions }) {
+export default function BoardToolbar({
+  selectedEl, selectedType, onAction,
+  selectMode, selectedCount, onEnterSelect, onExitSelect, onDeleteSelected,
+  ...actions
+}) {
   const [panel, setPanel]         = useState(null)
   const [panelText, setPanelText] = useState('')
+
+  // ── Select mode → slim selection bar (count · cancel · delete) ──────────────
+  if (selectMode) {
+    return (
+      <div className="bottom-bar board-bottom" onPointerDown={e => e.stopPropagation()}>
+        <div className="bottom-nav select-nav">
+          <button className="nav-btn" onClick={onExitSelect}>
+            <span className="nav-icon">✕</span>
+            <span className="nav-label">Cancel</span>
+          </button>
+          <span className="select-count">{selectedCount} selected</span>
+          <button className="nav-btn" onClick={onDeleteSelected} disabled={!selectedCount}>
+            <span className="nav-icon" style={{ color: '#e05555' }}>🗑</span>
+            <span className="nav-label">Delete</span>
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   // ── No selection → creation toolbar ────────────────────────────────────────
   if (!selectedEl) {
@@ -58,6 +81,10 @@ export default function BoardToolbar({ selectedEl, selectedType, onAction, ...ac
               <span className="nav-label">{item.label}</span>
             </button>
           ))}
+          <button className="nav-btn nav-btn--select" onClick={onEnterSelect}>
+            <span className="nav-icon" aria-hidden="true">◻</span>
+            <span className="nav-label">Select</span>
+          </button>
         </div>
       </div>
     )

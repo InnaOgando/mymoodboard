@@ -5,7 +5,7 @@ const DOUBLE_TAP_MS = 500
 
 export default function DraggableCard({
   x, y, scaleRef, onMove, onTap, onDoubleTap, onDragStart, onDragMove, onDragEnd,
-  children, selected, alwaysDraggable, locked, elId,
+  children, selected, checked, alwaysDraggable, locked, elId,
 }) {
   const isDragging = useRef(false)
   const startPointer = useRef({ x: 0, y: 0 })
@@ -149,7 +149,7 @@ export default function DraggableCard({
   return (
     <div
       ref={ref}
-      className={`draggable-card ${selected ? 'selected' : ''}`}
+      className={`draggable-card ${selected ? 'selected' : ''} ${checked ? 'multi-checked' : ''}`}
       style={{ left: x, top: y }}
       data-el-id={elId}
       onPointerDown={onPointerDown}
@@ -167,6 +167,7 @@ export default function DraggableCard({
       }}
     >
       {children}
+      {checked && <div className="multi-check" aria-hidden="true">✓</div>}
     </div>
   )
 }
