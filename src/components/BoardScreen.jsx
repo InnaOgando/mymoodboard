@@ -544,14 +544,8 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
       } else if (boardHit) {
         await dropSelectedIntoBoard(boardHit)
       } else {
-        const dx = nx - g.anchor.x
-        const dy = ny - g.anchor.y
-        for (const id of Object.keys(g.starts)) {
-          if (id === objectEl.id) continue
-          const el = elementsRef.current.find(e => e.id === id)
-          if (el) saveElement({ ...el, x: g.starts[id].x + dx, y: g.starts[id].y + dy })
-            .catch(e => console.error('[group-move] saveElement failed:', e))
-        }
+        // Dropped on empty canvas → tidy the selection into a 3-column grid
+        arrangeSelectedIntoGrid(nx, ny, g)
       }
       return
     }
@@ -616,6 +610,46 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
     movers.forEach(m => saveElement({ ...m, boardId: targetBoardId })
       .catch(e => console.error('[drop-board-many] saveElement failed:', e)))
     exitSelectMode()
+  }
+
+  // Tidy the selected objects into a 3-column grid, anchored at the group's
+  // current (dragged) top-left. Triggered when the selection is dropped on
+  // empty canvas — turns a scattered pile into an organized block.
+  function arrangeSelectedIntoGrid(anchorNx, anchorNy, g) {
+    const COLS = 3
+    const GAP = 24
+    const ids = selectedIdsRef.current
+    const movers = elementsRef.current.filter(e => ids.includes(e.id))
+    if (!movers.length) return
+    const dx = anchorNx - g.anchor.x
+    const dy = anchorNy - g.anchor.y
+    // Single item: nothing to tidy — just persist its move.
+    if (movers.length < 2) {
+      const m = movers[0]
+      const st = g.starts[m.id]
+      if (st) saveElement({ ...m, x: st.x + dx, y: st.y + dy })
+        .catch(e => console.error('[arrange] saveElement failed:', e))
+      return
+    }
+    // Order by current (dragged) reading order: top-to-bottom, left-to-right.
+    const withPos = movers.map(m => {
+      const st = g.starts[m.id]
+      return { m, cx: st ? st.x + dx : m.x, cy: st ? st.y + dy : m.y }
+    })
+    withPos.sort((a, b) => (a.cy - b.cy) || (a.cx - b.cx))
+    const cellW = Math.max(...movers.map(m => m.w || 150)) + GAP
+    const cellH = Math.max(...movers.map(m => m.h || 150)) + GAP
+    const originX = Math.min(...withPos.map(p => p.cx))
+    const originY = Math.min(...withPos.map(p => p.cy))
+    const updated = withPos.map((p, i) => {
+      const col = i % COLS
+      const row = Math.floor(i / COLS)
+      return { ...p.m, x: originX + col * cellW, y: originY + row * cellH }
+    })
+    const byId = new Map(updated.map(u => [u.id, u]))
+    setElements(prev => prev.map(e => byId.get(e.id) || e))
+    updated.forEach(u => saveElement(u).catch(e => console.error('[arrange] saveElement failed:', e)))
+    setSelectedIds([])
   }
 
   async function removeChildBoard(id) {
@@ -885,7 +919,11 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
       </header>
 
       <Canvas
-        onClick={() => { setSelectedId(null); setEditingId(null); setSelectedBoardId(null) }}
+        onClick={() => {
+          // Tap on empty canvas closes select mode (native feel) instead of forcing Cancel
+          if (selectMode) { exitSelectMode(); return }
+          setSelectedId(null); setEditingId(null); setSelectedBoardId(null)
+        }}
         scaleRef={scaleRef}
         offsetRef={canvasOffsetRef}
         containerRef={canvasContainerRef}

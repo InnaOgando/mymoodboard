@@ -40,6 +40,16 @@ body {
   flex-direction: column;
   height: 100dvh;
   overflow: hidden;
+  /* Prevent iOS native text/image selection + callout during long-press drag */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+/* Keep real form fields selectable/editable despite the blanket rule above */
+input, textarea, [contenteditable="true"] {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
 }
 
 /* ── Top bar ── */
