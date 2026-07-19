@@ -64,25 +64,29 @@ export default function BoardToolbar({
   if (!selectedEl) {
     return (
       <div className="bottom-bar board-bottom" onPointerDown={e => e.stopPropagation()}>
-        <div className="bottom-nav">
-          {CREATE_LEFT.map(item => (
-            <button key={item.type} className="nav-btn" onClick={() => onAction(item.type)}>
-              <img src={item.icon} alt={item.label} className="nav-icon-img" />
-              <span className="nav-label">{item.label}</span>
+        <div className="bottom-nav create-nav">
+          <div className="create-tools">
+            {CREATE_LEFT.map(item => (
+              <button key={item.type} className="nav-btn" onClick={() => onAction(item.type)}>
+                <img src={item.icon} alt={item.label} className="nav-icon-img" />
+                <span className="nav-label">{item.label}</span>
+              </button>
+            ))}
+            <button className="add-board-btn center-btn" onClick={() => onAction('board')}>
+              <img src={collectionIcon} alt="Board" className="nav-icon-img" />
+              <span>Board</span>
             </button>
-          ))}
-          <button className="add-board-btn center-btn" onClick={() => onAction('board')}>
-            <img src={collectionIcon} alt="Board" className="nav-icon-img" />
-            <span>Board</span>
-          </button>
-          {CREATE_RIGHT.map(item => (
-            <button key={item.type} className="nav-btn" onClick={() => onAction(item.type)}>
-              <img src={item.icon} alt={item.label} className="nav-icon-img" />
-              <span className="nav-label">{item.label}</span>
-            </button>
-          ))}
+            {CREATE_RIGHT.map(item => (
+              <button key={item.type} className="nav-btn" onClick={() => onAction(item.type)}>
+                <img src={item.icon} alt={item.label} className="nav-icon-img" />
+                <span className="nav-label">{item.label}</span>
+              </button>
+            ))}
+          </div>
           <button className="nav-btn nav-btn--select" onClick={onEnterSelect}>
-            <span className="nav-icon" aria-hidden="true">◻</span>
+            <svg className="nav-icon-img" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8M16 4h2.5A1.5 1.5 0 0 1 20 5.5V8M20 16v2.5a1.5 1.5 0 0 1-1.5 1.5H16M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16" />
+            </svg>
             <span className="nav-label">Select</span>
           </button>
         </div>

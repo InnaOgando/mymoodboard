@@ -1760,3 +1760,42 @@ body {
   line-height: 1.25;
   text-align: center;
 }
+
+.board-icon-card--child.drop-target {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+  transform: scale(1.05);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.22);
+}
+
+/* Creation bar: tools scroll horizontally, Select stays pinned & visible */
+.bottom-nav.create-nav {
+  justify-content: space-between;
+  gap: 4px;
+  flex-wrap: nowrap;
+}
+.create-tools {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.create-tools::-webkit-scrollbar { display: none; }
+.nav-btn--select {
+  flex: 0 0 auto;
+  border-left: 1px solid var(--border-light);
+  padding-left: 12px;
+}
+
+/* Fit all creation tools on screen (no horizontal scroll needed) */
+.bottom-nav.create-nav { gap: 2px; }
+.create-tools { gap: 1px; justify-content: space-between; }
+.create-tools .nav-btn { min-width: 0; padding: 3px 3px; }
+.create-tools .nav-label { font-size: 0.55rem; }
+.create-tools .nav-icon-img { width: 16px; height: 16px; }
+.create-tools .add-board-btn.center-btn { padding: 4px 8px; font-size: 0.72rem; }
+.create-tools .add-board-btn.center-btn .nav-icon-img { width: 16px; height: 16px; }
