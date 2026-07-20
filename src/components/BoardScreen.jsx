@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { uid, openUrl } from '../utils.js'
+import { uid, openUrl, stableFiles } from '../utils.js'
 import { getBoard, getBoards, saveBoard, deleteBoard, getElements, saveElement, deleteElement, exportAllData, importAllData, getStorageUsage } from '../db'
 import Canvas from './Canvas'
 import DraggableCard from './DraggableCard'
@@ -205,6 +205,8 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
       }
     } catch (err) {
       console.warn('[placement] addImageFromBlob processAndUpload failed:', err)
+      setStorageMsg("That image couldn't be added — try a screenshot of it instead.")
+      setTimeout(() => setStorageMsg(null), 8000)
     }
   }
 
@@ -855,6 +857,11 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
       catch (err) { console.warn('[placement] handleFiles processAndUpload failed:', err); metas.push(null) }
     }
     const good = metas.filter(Boolean)
+    const failedCount = imgs.length - good.length
+    if (failedCount > 0) {
+      setStorageMsg(`${failedCount} image${failedCount > 1 ? 's' : ''} couldn't be added — try adding a screenshot of ${failedCount > 1 ? 'them' : 'it'} instead.`)
+      setTimeout(() => setStorageMsg(null), 8000)
+    }
     const heights = good.map(m => (m.width ? Math.round(IMG_W * m.height / m.width) : IMG_W))
     if (good.length === 0) return
 
@@ -1122,9 +1129,9 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
       })()}
 
       <input ref={fileRef} type="file" accept="image/*" multiple style={{ display: 'none' }}
-        onChange={e => { handleFiles(Array.from(e.target.files)); e.target.value = '' }} />
+        onChange={async e => { const files = await stableFiles(Array.from(e.target.files)); e.target.value = ''; handleFiles(files) }} />
       <input ref={docRef} type="file" accept=".pdf,.doc,.docx" multiple style={{ display: 'none' }}
-        onChange={e => { handleFiles(Array.from(e.target.files)); e.target.value = '' }} />
+        onChange={async e => { const files = await stableFiles(Array.from(e.target.files)); e.target.value = ''; handleFiles(files) }} />
       <input ref={importRef} type="file" accept=".json" style={{ display: 'none' }} onChange={handleImport} />
 
       {showImagePicker && (

@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.2",
+    "heic2any": "^0.0.4",
     "idb": "^8.0.3",
     "react": "^19.2.6",
     "react-colorful": "^5.7.0",

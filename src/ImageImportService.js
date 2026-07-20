@@ -19,7 +19,8 @@ const IMAGE_CONFIG = {
  * @returns {{ blob: Blob, width: number, height: number, sizeBytes: number }}
  */
 export async function optimize(input) {
-  const blob = await _toBlob(input)
+  const raw = await _toBlob(input)
+  const blob = await ensureDecodable(raw)
   const bitmap = await createImageBitmap(blob)
   const { width: origW, height: origH } = bitmap
 
@@ -51,6 +52,20 @@ export async function optimize(input) {
   canvas.width = 1
   canvas.height = 1
   return { blob: result, width: w, height: h, sizeBytes: result.size }
+}
+
+// iPhone photos are frequently HEIC/HEIF, which most non-Safari browsers cannot
+// decode via createImageBitmap. Convert to JPEG first, lazy-loading the converter
+// ONLY when a HEIC/HEIF is actually encountered (zero cost for normal images).
+async function ensureDecodable(blob) {
+  const type = (blob.type || '').toLowerCase()
+  const name = (blob.name || '').toLowerCase()
+  const isHeic = type.includes('heic') || type.includes('heif') ||
+                 name.endsWith('.heic') || name.endsWith('.heif')
+  if (!isHeic) return blob
+  const { default: heic2any } = await import('heic2any')
+  const out = await heic2any({ blob, toType: 'image/jpeg', quality: 0.92 })
+  return Array.isArray(out) ? out[0] : out
 }
 
 async function _toBlob(input) {

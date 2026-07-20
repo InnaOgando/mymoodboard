@@ -1,4 +1,5 @@
 import { useRef } from 'react'
+import { stableFiles } from '../utils.js'
 import pasteIcon   from '../assets/screenshot.svg'
 import libraryIcon from '../assets/photolibrary.svg'
 import cameraIcon  from '../assets/camera.svg'
@@ -9,8 +10,10 @@ export default function ImagePicker({ onFiles, onPaste, onClose }) {
   const libRef = useRef()
   const camRef = useRef()
 
-  function handleFiles(e) {
-    const files = Array.from(e.target.files)
+  async function handleFiles(e) {
+    // Snapshot the picked files into stable blobs BEFORE clearing the input —
+    // iOS Safari can otherwise hand back a previous image's bytes (see stableFiles).
+    const files = await stableFiles(Array.from(e.target.files))
     e.target.value = ''
     onClose()
     onFiles(files)
