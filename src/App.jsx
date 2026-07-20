@@ -6,6 +6,7 @@ import AuthScreen from './components/AuthScreen'
 import { flushPendingOps, purgeOldDeletions } from './db'
 import { flushPendingImageUploads } from './ImageImportService'
 import DebugPanel from './components/DebugPanel'
+import UpdatePrompt from './components/UpdatePrompt'
 import './App.css'
 
 const SHOW_DEBUG = new URLSearchParams(window.location.search).get('debug') === '1'
@@ -156,6 +157,7 @@ export default function App() {
         <HomeScreen onOpenBoard={openBoard} session={session} />
       )}
       {SHOW_DEBUG && <DebugPanel />}
+      <UpdatePrompt />
     </div>
   )
 }
