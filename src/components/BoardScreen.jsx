@@ -1021,7 +1021,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
             onDragEnd={(nx, ny) => handleObjectDragEnd({ id: b.id, x: b.x, y: b.y, isBoard: true }, nx, ny)}
             onTap={() => {
               if (selectMode) { toggleSelectBoardId(b.id); return }
-              if (selectedBoardId === b.id) onOpenBoard(b.id)
+              if (selectedBoardId === b.id) { setSelectedBoardId(null); onOpenBoard(b.id) }
               else { setSelectedBoardId(b.id); setSelectedId(null); setEditingId(null) }
             }}
           >
