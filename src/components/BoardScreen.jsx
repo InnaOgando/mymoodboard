@@ -379,6 +379,14 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
     saveElement(updated).catch(e => console.error('[toggleLock]', e))
   }
 
+  function toggleBoardLock(id) {
+    const b = childBoardsRef.current.find(c => c.id === id)
+    if (!b) return
+    const updated = { ...b, locked: !b.locked }
+    setChildBoards(prev => prev.map(c => c.id === id ? updated : c))
+    saveBoard(updated).catch(e => console.error('[toggleBoardLock]', e))
+  }
+
   async function duplicateElement(el) {
     const vp = getViewport()
     const pos = findFreePosition(elementsRef.current, childBoardsRef.current, vp, el.w || 150, el.h || 150)
@@ -1004,6 +1012,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
         {childBoards.map(b => (
           <DraggableCard key={b.id} x={b.x} y={b.y} scaleRef={scaleRef}
             alwaysDraggable
+            locked={!!b.locked}
             selected={selectMode ? selectedBoardIds.includes(b.id) : selectedBoardId === b.id}
             checked={selectMode && selectedBoardIds.includes(b.id)}
             onMove={(x, y) => moveChildBoard(b.id, x, y)}
@@ -1086,18 +1095,24 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
       {selectedBoardId ? (
         <div className="bottom-bar board-bottom" onPointerDown={e => e.stopPropagation()}>
           <div className="bottom-nav" style={{ justifyContent: 'space-around' }}>
-            <button className="nav-btn" onClick={() => { const b = childBoards.find(c => c.id === selectedBoardId); setBoardRenameValue(b?.name || ''); setBoardRename(true) }}>
-              <span style={{ fontSize: 18, lineHeight: 1 }}>✎</span>
-              <span className="nav-label">Rename</span>
-            </button>
-            <button className="nav-btn" onClick={() => setBoardColorOpen(true)}>
-              <span style={{ fontSize: 18, lineHeight: 1 }}>🎨</span>
-              <span className="nav-label">Color</span>
-            </button>
-            <button className="nav-btn" onClick={() => { removeChildBoard(selectedBoardId); setSelectedBoardId(null) }}>
-              <span style={{ fontSize: 18, lineHeight: 1, color: '#e05555' }}>×</span>
-              <span className="nav-label">Delete</span>
-            </button>
+            {(() => { const selB = childBoards.find(c => c.id === selectedBoardId); return (<>
+              {!selB?.locked && <button className="nav-btn" onClick={() => { setBoardRenameValue(selB?.name || ''); setBoardRename(true) }}>
+                <span style={{ fontSize: 18, lineHeight: 1 }}>✎</span>
+                <span className="nav-label">Rename</span>
+              </button>}
+              {!selB?.locked && <button className="nav-btn" onClick={() => setBoardColorOpen(true)}>
+                <span style={{ fontSize: 18, lineHeight: 1 }}>🎨</span>
+                <span className="nav-label">Color</span>
+              </button>}
+              <button className="nav-btn" onClick={() => toggleBoardLock(selectedBoardId)}>
+                <span style={{ fontSize: 18, lineHeight: 1 }}>{selB?.locked ? '🔒' : '🔓'}</span>
+                <span className="nav-label">{selB?.locked ? 'Locked' : 'Lock'}</span>
+              </button>
+              {!selB?.locked && <button className="nav-btn" onClick={() => { removeChildBoard(selectedBoardId); setSelectedBoardId(null) }}>
+                <span style={{ fontSize: 18, lineHeight: 1, color: '#e05555' }}>×</span>
+                <span className="nav-label">Delete</span>
+              </button>}
+            </>)})()}
           </div>
         </div>
       ) : (() => {

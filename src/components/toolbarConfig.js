@@ -120,9 +120,10 @@ export const TOOLBAR_CONFIG = {
   document: COMMON,
 
   collection: [
-    { id: 'rename', label: 'Rename', icon: '✏', action: 'onRename' },
-    { id: 'color',  label: 'Color',  icon: '🎨', panel: 'colColor' },
+    { id: 'rename', label: 'Rename', icon: '✏', action: 'onRename', visible: el => !el.locked },
+    { id: 'color',  label: 'Color',  icon: '🎨', panel: 'colColor', visible: el => !el.locked },
     SEP,
+    LOCK,
     DUP,
     DELETE,
   ],
