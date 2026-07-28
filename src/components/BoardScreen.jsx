@@ -452,7 +452,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
       const updated = { ...col, content: { items: [...items, newItem] } }
       // Update UI immediately — do not await DB before showing the change
       setElements(prev => prev.filter(e => e.id !== objectEl.id).map(e => e.id === colId ? updated : e))
-      setSelectedId(colId)
+      setSelectedId(null)  // leave collection unselected after drop (avoids accidental eject)
       saveElement(updated).catch(e => console.error('[drop] saveElement failed:', e))
       deleteElement(objectEl.id).catch(e => console.error('[drop] deleteElement failed:', e))
     } catch (err) {
@@ -652,7 +652,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
     const updated = { ...col, content: { items: [...items, ...newItems] } }
     const moverIds = new Set(movers.map(m => m.id))
     setElements(prev => prev.filter(e => !moverIds.has(e.id)).map(e => e.id === colId ? updated : e))
-    setSelectedId(colId)
+    setSelectedId(null)  // leave collection unselected after drop (avoids accidental eject)
     saveElement(updated).catch(e => console.error('[drop-many] saveElement failed:', e))
     movers.forEach(m => deleteElement(m.id).catch(e => console.error('[drop-many] deleteElement failed:', e)))
     exitSelectMode()
