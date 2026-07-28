@@ -472,15 +472,17 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
     collectionHeightsCache.current = cache
   }
 
-  function hitTestCollection(cx, cy) {
-    const MARGIN = 20
+  function hitTestCollection(nx, ny, iw, ih) {
+    const MARGIN = 10
     const cols = elementsRef.current.filter(e => e.type === 'collection' || e.type === 'column')
     for (const col of cols) {
       const colW = col.w || 260
       const colH = collectionHeightsCache.current[col.id] ?? 200
       if (
-        cx >= col.x - MARGIN && cx <= col.x + colW + MARGIN &&
-        cy >= col.y - MARGIN && cy <= col.y + colH + MARGIN
+        nx < col.x + colW + MARGIN &&
+        nx + iw > col.x - MARGIN &&
+        ny < col.y + colH + MARGIN &&
+        ny + ih > col.y - MARGIN
       ) {
         return col.id
       }
@@ -555,10 +557,12 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
       setDropOverBoardId(null)
       return
     }
-    const cx = nx + (item.w || 150) / 2
-    const cy = ny + (item.h || 150) / 2
-    const colId = isCol ? null : hitTestCollection(cx, cy)
+    const iw = item.w || 150
+    const ih = item.h || 150
+    const colId = isCol ? null : hitTestCollection(nx, ny, iw, ih)
     setDropOverCollectionId(colId && colId !== item.id ? colId : null)
+    const cx = nx + iw / 2
+    const cy = ny + ih / 2
     const boardHit = colId ? null : hitTestChildBoard(cx, cy)
     setDropOverBoardId(boardHit)
   }
@@ -576,9 +580,11 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
       groupDragRef.current = null
       // Collection/board drop only for a pure-object group with an object anchor.
       if (!isBoard && !g.hasBoards) {
-        const cx = nx + (item.w || 150) / 2
-        const cy = ny + (item.h || 150) / 2
-        const colId = isCol ? null : hitTestCollection(cx, cy)
+        const iw = item.w || 150
+        const ih = item.h || 150
+        const colId = isCol ? null : hitTestCollection(nx, ny, iw, ih)
+        const cx = nx + iw / 2
+        const cy = ny + ih / 2
         const boardHit = colId ? null : hitTestChildBoard(cx, cy)
         if (colId && colId !== item.id) { await dropSelectedIntoCollection(colId); return }
         if (boardHit) { await dropSelectedIntoBoard(boardHit); return }
@@ -590,9 +596,11 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
 
     // Single (non-group) object drag → drop into collection/board.
     if (!isBoard) {
-      const cx = nx + (item.w || 150) / 2
-      const cy = ny + (item.h || 150) / 2
-      const colId = isCol ? null : hitTestCollection(cx, cy)
+      const iw = item.w || 150
+      const ih = item.h || 150
+      const colId = isCol ? null : hitTestCollection(nx, ny, iw, ih)
+      const cx = nx + iw / 2
+      const cy = ny + ih / 2
       const boardHit = colId ? null : hitTestChildBoard(cx, cy)
       if (colId && colId !== item.id) { await dropIntoCollection(item, colId); return }
       if (boardHit) { await dropIntoBoard(item, boardHit); return }

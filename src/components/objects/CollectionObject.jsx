@@ -134,6 +134,7 @@ export default function CollectionObject({
                     <button
                       className="col-img-eject"
                       onPointerDown={e => e.stopPropagation()}
+                      onPointerUp={e => e.stopPropagation()}
                       onClick={e => { e.stopPropagation(); onEjectItem?.(item.id) }}
                       title="Move to canvas"
                     >↗</button>

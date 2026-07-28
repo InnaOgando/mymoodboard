@@ -42,6 +42,9 @@ export async function getDB() {
 // sync will then get the correct server state).
 const _pendingElementWrites = new Set()
 const _pendingBoardWrites   = new Set()
+// Timestamp of last local write per element — guards against a sync that reads
+// Supabase before our upsert lands, then overwrites our local rename/edit.
+const _elementWriteTimes = new Map()
 
 // ── User identity ─────────────────────────────────────────────────────────────
 
@@ -535,6 +538,8 @@ async function _syncElementsDown(boardId, userId, db, pendingDeletes) {
     const el = fromSupabaseElement(row)
     if (pendingUpserts.has(el.id)) continue
     if (_pendingElementWrites.has(el.id)) continue
+    const lastWrite = _elementWriteTimes.get(el.id)
+    if (lastWrite && Date.now() - lastWrite < 15000) continue
     if (el.deletedAt) {
       await tx.objectStore('elements').delete(el.id)
       continue
@@ -548,6 +553,7 @@ async function _syncElementsDown(boardId, userId, db, pendingDeletes) {
 export async function saveElement(el, { skipRemote = false } = {}) {
   const db = await getDB()
   await db.put('elements', el)
+  _elementWriteTimes.set(el.id, Date.now())
   if (skipRemote) return
   const userId = await currentUserId()
   // No user yet (auth still resolving) OR offline → queue a durable upsert.
