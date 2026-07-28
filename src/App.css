@@ -1000,7 +1000,26 @@ input, textarea, [contenteditable="true"] {
   padding: 12px 12px 11px;
   border-bottom: 1px solid #d8d8d8;
   cursor: grab;
+  position: relative;
 }
+.col-expand {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  border-radius: 7px;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0;
+}
+.col-expand:hover { background: var(--border-light); color: var(--text); }
 .col-header:active { cursor: grabbing; }
 
 .col-header-icon {

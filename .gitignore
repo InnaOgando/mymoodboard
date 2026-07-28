@@ -31,3 +31,6 @@ dist-ssr
 *.xlsx
 *.pptx
 *.pdf
+
+# Claude Code local files
+.claude/

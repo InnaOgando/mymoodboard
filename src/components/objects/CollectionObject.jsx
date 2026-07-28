@@ -103,7 +103,7 @@ function CollectionItem({ item }) {
 }
 
 export default function CollectionObject({
-  el, selected, isDropTarget, onResize, onEjectItem, scaleRef,
+  el, selected, isDropTarget, onResize, onEjectItem, onOpen, scaleRef,
 }) {
   const w = el.w || 260
   const items = getCollectionItems(el.content)
@@ -120,6 +120,18 @@ export default function CollectionObject({
         <div className="col-header drag-handle" style={{ background: accentColor ? `${accentColor}1a` : undefined }}>
           <span className="col-header-icon" />
           <span className="col-header-title">{label}</span>
+          <button
+            className="col-expand"
+            onPointerDown={e => e.stopPropagation()}
+            onPointerUp={e => e.stopPropagation()}
+            onClick={e => { e.stopPropagation(); onOpen?.() }}
+            title="Open collection"
+            aria-label="Open collection"
+          >
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M8 4H5a1 1 0 0 0-1 1v3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3" />
+            </svg>
+          </button>
         </div>
 
         {items.length === 0 ? (

@@ -764,7 +764,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
     if (el.locked) return
     const type = normalizeType(el.type)
     if (type === 'image') setPreviewEl(el)
-    else if (type === 'collection') setGalleryEl(el)
+    // collections open via the header expand button (avoids tap/eject conflict)
     else if (type === 'link') openUrl(el.content?.url?.trim())
     else if (['idea', 'text', 'note', 'todo'].includes(type)) setEditingId(el.id)
   }
@@ -1092,6 +1092,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
               onResize={(w, h) => resizeElement(el.id, w, h)}
               onMakeCollection={() => makeCollection(el)}
               onEjectItem={itemId => ejectFromCollection(el.id, itemId)}
+              onOpen={() => setGalleryEl(el)}
               isDropTarget={dropOverCollectionId === el.id}
               scaleRef={scaleRef}
             />
