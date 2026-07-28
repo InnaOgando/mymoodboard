@@ -573,7 +573,9 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
     const g = groupDragRef.current
     const isBoard = !!item.isBoard
     const isCol = !isBoard && normalizeType(item.type) === 'collection'
-    collectionHeightsCache.current = {}
+    // NOTE: do NOT clear collectionHeightsCache here — the hit-tests below read it.
+    // It is rebuilt on every drag start (buildCollectionHeightsCache), so leaving
+    // it populated is safe and correct.
 
     // Group drag (select mode): the dragged item is part of the selection.
     if (g && g.anchorId === item.id) {
