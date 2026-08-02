@@ -49,7 +49,7 @@ export default function IdeaObject({ el, selected, editing, onUpdate, onResize, 
   const baseTextRef = useRef('')
   const w = el.w || 220
   const h = el.h || 120
-  const fontScale = Math.min(4, Math.max(0.6, w / 220))
+  const fontSize = el.content.fontSize || 15
   const text = el.content.text || ''
   const title = el.content.title || ''
   const bgColor = el.content.bgColor || null
@@ -84,7 +84,7 @@ export default function IdeaObject({ el, selected, editing, onUpdate, onResize, 
         style={{ width: w, height: h, background: bgColor || undefined }}>
         <div className="drag-handle">
           <span className="handle-dots">⠿</span>
-          <span className="idea-label" style={{ fontSize: `${(0.65 * fontScale).toFixed(3)}rem` }}>{title || 'Idea'}</span>
+          <span className="idea-label">{title || 'Idea'}</span>
           {speechAvail && (
             <button
               className={`idea-mic-btn ${listening ? 'listening' : ''}`}
@@ -98,7 +98,7 @@ export default function IdeaObject({ el, selected, editing, onUpdate, onResize, 
         <textarea
           ref={textRef}
           className="card-textarea card-textarea-idea"
-          style={{ height: h - 32, width: '100%', fontSize: `${(0.95 * fontScale).toFixed(3)}rem`, color: listening && interim ? '#888' : 'inherit', background: 'transparent', pointerEvents: editing ? 'auto' : 'none' }}
+          style={{ height: h - 32, width: '100%', fontSize: `${fontSize}px`, color: listening && interim ? '#888' : 'inherit', background: 'transparent', pointerEvents: editing ? 'auto' : 'none' }}
           readOnly={!editing}
           value={displayText}
           onChange={e => { if (!listening) onUpdate({ ...el.content, text: e.target.value }) }}

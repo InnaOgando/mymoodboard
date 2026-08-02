@@ -426,6 +426,16 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
     saveElement(updated).catch(e => console.error('[todoTitle]', e))
   }
 
+  function changeIdeaFontSize(id, delta) {
+    const el = elementsRef.current.find(e => e.id === id)
+    if (!el) return
+    const cur = el.content.fontSize || 15
+    const next = Math.min(40, Math.max(11, cur + delta))
+    const updated = { ...el, content: { ...el.content, fontSize: next } }
+    setElements(prev => prev.map(e => e.id === id ? updated : e))
+    saveElement(updated).catch(e => console.error('[fontSize]', e))
+  }
+
   function renameCollection(id) {
     const col = elementsRef.current.find(e => e.id === id)
     if (!col) return
@@ -1147,6 +1157,8 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
             onCaption={caption => setElementCaption(selectedId, caption)}
             onBgColor={color => setElementBgColor(selectedId, color)}
             onAddTitle={title => setTodoTitle(selectedId, title)}
+            onFontBigger={() => changeIdeaFontSize(selectedId, 2)}
+            onFontSmaller={() => changeIdeaFontSize(selectedId, -2)}
             onEdit={() => setEditingId(selectedId)}
             onRename={() => renameCollection(selectedId)}
             onColor={color => setCollectionColor(selectedId, color)}

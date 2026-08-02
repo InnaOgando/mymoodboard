@@ -89,6 +89,8 @@ export const TOOLBAR_CONFIG = {
 
   idea: [
     { id: 'edit',    label: 'Edit',  icon: '✏', action: 'onEdit', visible: el => !el.locked },
+    { id: 'fontDown', label: 'Smaller', icon: 'A−', action: 'onFontSmaller', visible: el => !el.locked },
+    { id: 'fontUp',   label: 'Bigger',  icon: 'A+', action: 'onFontBigger',  visible: el => !el.locked },
     { id: 'title',   label: 'Title', icon: 'T',
       panel: 'title', initText: el => el?.content?.title ?? '' },
     { id: 'bgColor', label: 'Color',
