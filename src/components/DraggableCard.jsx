@@ -2,6 +2,7 @@ import { useRef } from 'react'
 
 const INTERACTIVE = new Set(['INPUT', 'TEXTAREA', 'SELECT', 'A'])
 const DOUBLE_TAP_MS = 500
+const TAP_MIN_MS = 130   // a deliberate touch must rest this long to select
 
 export default function DraggableCard({
   x, y, scaleRef, onMove, onTap, onDoubleTap, onDragStart, onDragMove, onDragEnd,
@@ -99,9 +100,11 @@ export default function DraggableCard({
     if (!e.isPrimary) return
     const dx = e.clientX - startPointer.current.x
     const dy = e.clientY - startPointer.current.y
-    // Cancel long-press if finger moves significantly
-    if (longTimer.current && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
-      cancelLong()
+    // Any real finger movement ⇒ this is a pan/graze, not a tap.
+    // Mark moved so onPointerUp will NOT fire onTap() and select the card.
+    if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
+      moved.current = true
+      if (longTimer.current) cancelLong()
     }
     if (!isDragging.current) return
     const s = scaleRef?.current ?? 1
@@ -139,8 +142,11 @@ export default function DraggableCard({
         lastTapDown.current = 0  // consume, so a 3rd tap starts fresh
         onDoubleTap?.()
       } else {
+        // Deliberate-touch: a fleeting graze (< TAP_MIN_MS) is ignored.
+        // Always record the down time so a following tap can still pair into a double-tap (edit).
+        const held = Date.now() - curDownTime.current
         lastTapDown.current = curDownTime.current
-        onTap?.()
+        if (held >= TAP_MIN_MS) onTap?.()
       }
     }
     isDragging.current = false
