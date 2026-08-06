@@ -1055,7 +1055,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
         ))}
 
         {elements.map(el => (
-          <DraggableCard key={el.id} elId={el.id} x={el.x} y={el.y} scaleRef={scaleRef}
+          <DraggableCard key={el.id} elId={el.id} x={el.x} y={el.y} scaleRef={scaleRef} tapMinMs={130}
             selected={selectMode ? selectedIds.includes(el.id) : selectedId === el.id}
             checked={selectMode && selectedIds.includes(el.id)}
             locked={!!el.locked}

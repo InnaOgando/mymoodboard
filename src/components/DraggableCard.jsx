@@ -2,11 +2,11 @@ import { useRef } from 'react'
 
 const INTERACTIVE = new Set(['INPUT', 'TEXTAREA', 'SELECT', 'A'])
 const DOUBLE_TAP_MS = 500
-const TAP_MIN_MS = 130   // a deliberate touch must rest this long to select
 
 export default function DraggableCard({
   x, y, scaleRef, onMove, onTap, onDoubleTap, onDragStart, onDragMove, onDragEnd,
   children, selected, checked, alwaysDraggable, locked, elId,
+  tapMinMs = 0,   // min contact time (ms) for a tap to count as a select; 0 = any tap
 }) {
   const isDragging = useRef(false)
   const startPointer = useRef({ x: 0, y: 0 })
@@ -146,7 +146,7 @@ export default function DraggableCard({
         // Always record the down time so a following tap can still pair into a double-tap (edit).
         const held = Date.now() - curDownTime.current
         lastTapDown.current = curDownTime.current
-        if (held >= TAP_MIN_MS) onTap?.()
+        if (held >= tapMinMs) onTap?.()
       }
     }
     isDragging.current = false
