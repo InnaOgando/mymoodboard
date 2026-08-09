@@ -1475,14 +1475,28 @@ input, textarea, [contenteditable="true"] {
 /* ── Object toolbar (contextual mode of the bottom bar) ── */
 /* Replaces creation buttons in-place when an object is selected. */
 .bottom-nav.obj-toolbar {
+  display: flex;
+  align-items: center;
   justify-content: flex-start;
-  overflow-x: auto;
+  overflow: hidden;
   gap: 0;
   padding: 0 4px;
+}
+.obj-toolbar-scroll {
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
 }
-.bottom-nav.obj-toolbar::-webkit-scrollbar { display: none; }
+.obj-toolbar-scroll::-webkit-scrollbar { display: none; }
+.obj-toolbar-pinned {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
 
 /* Panel that appears above the button row inside the bottom bar */
 .obj-panel {

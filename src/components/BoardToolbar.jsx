@@ -118,6 +118,15 @@ export default function BoardToolbar({
     visibleItems.pop()
   }
 
+  // Pin the most-used actions (Lock, Delete) to the right so they're always
+  // reachable; everything else lives in the scrollable region.
+  const PINNED_IDS = ['lock', 'delete']
+  const pinnedItems = visibleItems.filter(i => PINNED_IDS.includes(i.id))
+  const scrollItems = visibleItems.filter(i => !PINNED_IDS.includes(i.id))
+  // Strip separators left dangling at the edges after pulling pinned items out.
+  while (scrollItems.length && scrollItems[scrollItems.length - 1].sep) scrollItems.pop()
+  while (scrollItems.length && scrollItems[0].sep) scrollItems.shift()
+
   const panelDef = panel ? PANEL_DEFS[panel] : null
 
   function handleItemClick(item) {
@@ -178,35 +187,45 @@ export default function BoardToolbar({
         </div>
       )}
 
-      {/* Button row */}
+      {/* Button row — most-used actions (Lock, Delete) pinned right; rest scrolls */}
       <div className="bottom-nav obj-toolbar">
-        {visibleItems.map(item => {
-          if (item.sep) return <div key={item.id} className="ft-sep" />
-
-          const label    = resolve(item.label, selectedEl)
-          const icon     = resolve(item.icon,  selectedEl)
-          const iconSt   = item.iconStyle ? item.iconStyle(selectedEl) : null
-          const isActive = (item.active && item.active(selectedEl)) || panel === item.panel
-
-          return (
-            <button
-              key={item.id}
-              className={[
-                'ft-btn',
-                item.danger ? 'ft-btn--danger' : '',
-                isActive    ? 'ft-btn--active'  : '',
-              ].filter(Boolean).join(' ')}
-              onClick={() => handleItemClick(item)}
-            >
-              {iconSt
-                ? <span className="ft-icon" style={iconSt} />
-                : <span className="ft-icon">{icon}</span>
-              }
-              <span className="ft-label">{label}</span>
-            </button>
-          )
-        })}
+        <div className="obj-toolbar-scroll">
+          {scrollItems.map(renderItem)}
+        </div>
+        {pinnedItems.length > 0 && (
+          <div className="obj-toolbar-pinned">
+            <div className="ft-sep" />
+            {pinnedItems.map(renderItem)}
+          </div>
+        )}
       </div>
     </div>
   )
+
+  function renderItem(item) {
+    if (item.sep) return <div key={item.id} className="ft-sep" />
+
+    const label    = resolve(item.label, selectedEl)
+    const icon     = resolve(item.icon,  selectedEl)
+    const iconSt   = item.iconStyle ? item.iconStyle(selectedEl) : null
+    const isActive = (item.active && item.active(selectedEl)) || panel === item.panel
+
+    return (
+      <button
+        key={item.id}
+        className={[
+          'ft-btn',
+          item.danger ? 'ft-btn--danger' : '',
+          isActive    ? 'ft-btn--active'  : '',
+        ].filter(Boolean).join(' ')}
+        onClick={() => handleItemClick(item)}
+      >
+        {iconSt
+          ? <span className="ft-icon" style={iconSt} />
+          : <span className="ft-icon">{icon}</span>
+        }
+        <span className="ft-label">{label}</span>
+      </button>
+    )
+  }
 }
