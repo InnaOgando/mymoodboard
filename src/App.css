@@ -2019,3 +2019,20 @@ input, textarea, [contenteditable="true"] {
   border-radius: 8px; padding: 9px 16px; font-weight: 600; cursor: pointer; font-family: inherit;
 }
 .btn-danger:disabled { opacity: 0.5; }
+
+/* Help view */
+.settings-help-q {
+  width: 20px; height: 20px; flex: 0 0 auto;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%; background: var(--accent); color: #fff;
+  font-size: 0.8rem; font-weight: 700;
+}
+.settings-help-note { color: var(--muted); font-size: 0.82rem; margin: -8px 4px 20px; }
+.settings-help-heading { font-weight: 700; color: var(--text); margin: 4px 4px 10px; }
+.settings-help-item { border-bottom: 1px solid var(--border-light); }
+.settings-help-item:last-child { border-bottom: none; }
+.settings-help-item .settings-row { border-bottom: none; }
+.settings-help-answer {
+  color: var(--muted); font-size: 0.9rem; line-height: 1.5;
+  padding: 0 16px 14px; margin: 0;
+}

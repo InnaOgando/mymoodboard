@@ -277,13 +277,13 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
   }
 
   async function updateContent(id, content) {
-    // Build from the ref and sync it eagerly so a save that fires immediately
-    // after (e.g. auto-resize) reads this fresh state instead of clobbering it.
-    const next = elementsRef.current.map(el => el.id === id ? { ...el, content } : el)
-    elementsRef.current = next
-    setElements(next)
-    const el = next.find(e => e.id === id)
-    if (el) await saveElement(el)
+    // FUNCTIONAL update — must never replace state from a stale snapshot, or a
+    // save/resize firing during load could blank the whole board. `merged`
+    // captures the fresh row so the save carries the correct content.
+    let merged = null
+    setElements(prev => prev.map(el => el.id === id ? (merged = { ...el, content }) : el))
+    if (!merged) { const c = elementsRef.current.find(e => e.id === id); merged = c ? { ...c, content } : null }
+    if (merged) await saveElement(merged)
   }
 
   async function removeElement(id) {
@@ -313,13 +313,13 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
   }
 
   async function resizeElement(id, w, h) {
-    // Merge w/h onto the freshest element (never a stale snapshot), so a resize
-    // that lands right after a content update can't overwrite the new content.
-    const next = elementsRef.current.map(el => el.id === id ? { ...el, w, h } : el)
-    elementsRef.current = next
-    setElements(next)
-    const el = next.find(e => e.id === id)
-    if (el) await saveElement(el)
+    // FUNCTIONAL update so an auto-grow resize firing during render/load can
+    // never wipe the board. `merged` keeps the latest content, so changing w/h
+    // does not clobber a note's text.
+    let merged = null
+    setElements(prev => prev.map(el => el.id === id ? (merged = { ...el, w, h }) : el))
+    if (!merged) { const c = elementsRef.current.find(e => e.id === id); merged = c ? { ...c, w, h } : null }
+    if (merged) await saveElement(merged)
   }
 
   // ── Collection operations ───────────────────────────────────────────────────

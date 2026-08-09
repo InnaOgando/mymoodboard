@@ -11,6 +11,8 @@ const APP_VERSION = 'v1.0'
 const PRIVACY_URL = '/privacy-policy'
 // Apple's standard EULA — swap for your own Terms page when you have one.
 const TERMS_URL   = 'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/'
+// TODO: replace with your dedicated support email once created.
+const SUPPORT_EMAIL = 'yaskii.ill@gmail.com'
 
 function initials(name, email) {
   const src = (name || email || '?').trim()
@@ -30,23 +32,26 @@ export default function SettingsScreen({ session, usage, onClose, onExport, onRe
 
   return (
     <div className="settings-screen">
-      {view === 'main'
-        ? <MainView
+      {view === 'account'
+        ? <AccountView
+            name={name} email={email}
+            onBack={() => setView('main')} onClose={onClose} onSignOut={onSignOut}
+          />
+        : view === 'help'
+        ? <HelpView onBack={() => setView('main')} onClose={onClose} />
+        : <MainView
             name={name} email={email} initials={initials(name, email)}
             mb={mb} limitMb={limitMb} ratio={ratio}
             onClose={onClose} onExport={onExport} onRestore={onRestore}
             onSignOut={onSignOut} onAccount={() => setView('account')}
-          />
-        : <AccountView
-            name={name} email={email}
-            onBack={() => setView('main')} onClose={onClose} onSignOut={onSignOut}
+            onHelp={() => setView('help')}
           />
       }
     </div>
   )
 }
 
-function MainView({ name, email, initials, mb, limitMb, ratio, onClose, onExport, onRestore, onSignOut, onAccount }) {
+function MainView({ name, email, initials, mb, limitMb, ratio, onClose, onExport, onRestore, onSignOut, onAccount, onHelp }) {
   return (
     <>
       <div className="settings-topbar">
@@ -68,6 +73,11 @@ function MainView({ name, email, initials, mb, limitMb, ratio, onClose, onExport
           <button className="settings-row" onClick={onAccount}>
             <img className="settings-row-icon" src={renameIcon} alt="" />
             <span>Account settings</span>
+            <span className="settings-chevron">&#8250;</span>
+          </button>
+          <button className="settings-row" onClick={onHelp}>
+            <span className="settings-help-q">?</span>
+            <span>Help &amp; getting started</span>
             <span className="settings-chevron">&#8250;</span>
           </button>
         </div>
@@ -222,6 +232,66 @@ function AccountView({ name, email, onBack, onClose, onSignOut }) {
               </div>
             </div>
           )}
+        </div>
+      </div>
+    </>
+  )
+}
+
+
+const HELP_ITEMS = [
+  { q: 'Create your first board',
+    a: 'On the home screen tap "New Board", give it a name, and open it. Boards hold all your references — images, notes, palettes and more.' },
+  { q: 'Add images & screenshots',
+    a: 'Inside a board, use the image button in the bottom bar to add from your photo library, take a photo, or paste a screenshot. Drag to move, use the corner handle to resize.' },
+  { q: 'Voice notes (the mic idea card)',
+    a: 'Add an Idea card and tap the microphone. Speak, then tap stop — your words are transcribed into the note automatically, in any language.' },
+  { q: 'Color palettes',
+    a: 'Add a Palette to save colors you love. Double-tap a swatch to pick a new color; the HEX code shows below so you can copy it.' },
+  { q: 'Links & documents',
+    a: 'Save web links and text documents alongside your visuals so everything for a project lives in one board.' },
+  { q: 'Gestures',
+    a: 'Tap to select, drag to move, use the bottom-right handle to resize, and double-tap an object to edit it. Long-press for quick actions.' },
+]
+
+function HelpView({ onBack, onClose }) {
+  const [open, setOpen] = useState(-1)
+  const mailto = (subject) => `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(subject)}`
+  return (
+    <>
+      <div className="settings-topbar">
+        <button className="settings-back" onClick={onBack}>&#8249;</button>
+        <span className="settings-title">Help</span>
+        <button className="settings-done" onClick={onClose}>Done</button>
+      </div>
+
+      <div className="settings-scroll">
+        <div className="settings-list">
+          <a className="settings-row" href={mailto('RefMemo — Support request')}>
+            <span>Send us a message</span>
+            <span className="settings-chevron">&#8250;</span>
+          </a>
+        </div>
+        <p className="settings-help-note">We typically reply within a day.</p>
+
+        <div className="settings-help-heading">Getting started</div>
+        <div className="settings-list">
+          {HELP_ITEMS.map((item, i) => (
+            <div key={i} className="settings-help-item">
+              <button className="settings-row" onClick={() => setOpen(open === i ? -1 : i)}>
+                <span>{item.q}</span>
+                <span className="settings-chevron">{open === i ? '–' : '+'}</span>
+              </button>
+              {open === i && <p className="settings-help-answer">{item.a}</p>}
+            </div>
+          ))}
+        </div>
+
+        <div className="settings-list">
+          <a className="settings-row" href={mailto('RefMemo — Feature request')}>
+            <span>Request a feature</span>
+            <span className="settings-chevron">&#8250;</span>
+          </a>
         </div>
       </div>
     </>
