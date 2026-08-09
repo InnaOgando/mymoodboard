@@ -1,47 +1,82 @@
 import { useState, useEffect, useRef } from 'react'
 import ResizeHandle from '../ResizeHandle'
+import { supabase } from '../../supabase'
 
+// Records audio (works reliably inside the iOS WKWebView, unlike Web Speech API)
+// then sends it to the Netlify transcribe function -> OpenAI gpt-4o-transcribe.
+// UX: tap mic -> speak -> tap stop -> ~1-2s -> transcribed text appended.
 function useSpeechRecognition() {
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition
-  const [available] = useState(!!SR)
+  const [available] = useState(
+    typeof navigator !== 'undefined' &&
+    !!navigator.mediaDevices?.getUserMedia &&
+    typeof window !== 'undefined' && !!window.MediaRecorder
+  )
   const [listening, setListening] = useState(false)
-  const [interim, setInterim] = useState('')
+  const [transcribing, setTranscribing] = useState(false)
   const recRef = useRef(null)
-  const finalAccumRef = useRef('')
+  const chunksRef = useRef([])
+  const streamRef = useRef(null)
+  const onChangeRef = useRef(null)
 
-  function start(onChange) {
-    if (!SR) return
-    const rec = new SR()
-    rec.continuous = true
-    rec.interimResults = true
-    rec.lang = navigator.language || 'en-US'
-    finalAccumRef.current = ''
-
-    rec.onresult = (e) => {
-      let interimText = ''
-      let finalText = ''
-      for (const result of Array.from(e.results)) {
-        if (result.isFinal) finalText += result[0].transcript
-        else interimText += result[0].transcript
+  async function start(onChange) {
+    if (!available) return
+    onChangeRef.current = onChange
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      streamRef.current = stream
+      const mime = MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4'
+        : MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm'
+        : ''
+      const rec = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream)
+      chunksRef.current = []
+      rec.ondataavailable = (e) => { if (e.data && e.data.size > 0) chunksRef.current.push(e.data) }
+      rec.onstop = async () => {
+        streamRef.current?.getTracks().forEach(t => t.stop())
+        const blob = new Blob(chunksRef.current, { type: rec.mimeType || 'audio/webm' })
+        await transcribe(blob)
       }
-      if (finalText) finalAccumRef.current = finalText
-      setInterim(interimText)
-      onChange(finalAccumRef.current, interimText)
+      rec.start()
+      recRef.current = rec
+      setListening(true)
+    } catch (e) {
+      console.warn('[voice] mic error', e)
+      setListening(false)
     }
-    rec.onend = () => { setListening(false); setInterim('') }
-    rec.onerror = (e) => { console.warn('[speech]', e.error); setListening(false); setInterim('') }
-    rec.start()
-    recRef.current = rec
-    setListening(true)
   }
 
   function stop() {
-    recRef.current?.stop()
+    if (recRef.current && recRef.current.state !== 'inactive') recRef.current.stop()
     setListening(false)
-    setInterim('')
   }
 
-  return { available, listening, interim, start, stop }
+  async function transcribe(blob) {
+    if (!blob || blob.size === 0) return
+    setTranscribing(true)
+    try {
+      const b64 = await blobToBase64(blob)
+      const { data, error } = await supabase.functions.invoke('transcribe', {
+        body: { audio: b64, mimeType: blob.type },
+      })
+      if (error) console.warn('[voice] transcribe error', error)
+      else if (data?.text) onChangeRef.current?.(data.text.trim())
+      else console.warn('[voice] no text returned', data)
+    } catch (e) {
+      console.warn('[voice] transcribe error', e)
+    } finally {
+      setTranscribing(false)
+    }
+  }
+
+  return { available, listening, transcribing, start, stop }
+}
+
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onloadend = () => resolve(String(reader.result).split(',')[1])
+    reader.onerror = reject
+    reader.readAsDataURL(blob)
+  })
 }
 
 export default function IdeaObject({ el, selected, editing, onUpdate, onResize, scaleRef }) {
@@ -54,17 +89,18 @@ export default function IdeaObject({ el, selected, editing, onUpdate, onResize, 
   const title = el.content.title || ''
   const bgColor = el.content.bgColor || null
   const [speechMsg, setSpeechMsg] = useState('')
-  const { available: speechAvail, listening, interim, start, stop } = useSpeechRecognition()
+  const { available: speechAvail, listening, transcribing, start, stop } = useSpeechRecognition()
 
   useEffect(() => {
     if (editing) setTimeout(() => textRef.current?.focus(), 50)
   }, [editing])
 
   function handleMic() {
+    if (transcribing) return
     if (listening) {
       stop()
     } else if (!speechAvail) {
-      setSpeechMsg('Speech recognition not available.')
+      setSpeechMsg('Recording not available on this device.')
       setTimeout(() => setSpeechMsg(''), 3000)
     } else {
       baseTextRef.current = text
@@ -76,7 +112,7 @@ export default function IdeaObject({ el, selected, editing, onUpdate, onResize, 
     }
   }
 
-  const displayText = listening ? (text ? text.trimEnd() + ' ' : '') + interim : text
+  const displayText = text
 
   return (
     <div style={{ position: 'relative', width: w }}>
@@ -87,23 +123,25 @@ export default function IdeaObject({ el, selected, editing, onUpdate, onResize, 
           <span className="idea-label">{title || 'Idea'}</span>
           {speechAvail && (
             <button
-              className={`idea-mic-btn ${listening ? 'listening' : ''}`}
+              className={`idea-mic-btn ${listening ? 'listening' : ''} ${transcribing ? 'transcribing' : ''}`}
               onPointerDown={e => e.stopPropagation()}
               onClick={e => { e.stopPropagation(); handleMic() }}
-              title={listening ? 'Stop recording' : 'Speak'}
-            >{listening ? '⏹' : '🎙'}</button>
+              disabled={transcribing}
+              title={transcribing ? 'Transcribing…' : listening ? 'Stop recording' : 'Speak'}
+            >{transcribing ? '⏳' : listening ? '⏹' : '🎙'}</button>
           )}
           {listening && <span className="listening-dot" title="Recording…" />}
         </div>
         <textarea
           ref={textRef}
           className="card-textarea card-textarea-idea"
-          style={{ height: h - 32, width: '100%', fontSize: `${fontSize}px`, color: listening && interim ? '#888' : 'inherit', background: 'transparent', pointerEvents: editing ? 'auto' : 'none' }}
+          style={{ height: h - 32, width: '100%', fontSize: `${fontSize}px`, color: 'inherit', background: 'transparent', pointerEvents: editing ? 'auto' : 'none' }}
           readOnly={!editing}
           value={displayText}
           onChange={e => { if (!listening) onUpdate({ ...el.content, text: e.target.value }) }}
           placeholder="Your idea…"
         />
+        {transcribing && <div className="speech-msg">Transcribing…</div>}
         {speechMsg && <div className="speech-msg">{speechMsg}</div>}
       </div>
       {selected && <ResizeHandle w={w} h={h} onResize={onResize} minW={120} minH={60} scaleRef={scaleRef} />}
