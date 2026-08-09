@@ -95,6 +95,18 @@ export default function IdeaObject({ el, selected, editing, onUpdate, onResize, 
     if (editing) setTimeout(() => textRef.current?.focus(), 50)
   }, [editing])
 
+  // Auto-grow the card height to fit the note (e.g. after a long transcription).
+  // Grows only — never shrinks below what the user set. Caps at MAX_AUTO_H.
+  const HEADER_H = 32
+  const MAX_AUTO_H = 700
+  useEffect(() => {
+    const ta = textRef.current
+    if (!ta) return
+    const needed = Math.min(MAX_AUTO_H, ta.scrollHeight + HEADER_H + 2)
+    if (needed > h + 1) onResize(w, needed)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [text, w, fontSize])
+
   function handleMic() {
     if (transcribing) return
     if (listening) {
