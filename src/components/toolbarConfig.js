@@ -32,6 +32,16 @@
  */
 
 import { PRESET_COLORS } from '../colors'
+import lockedIcon    from '../assets/locked.svg'
+import unlockedIcon  from '../assets/unlocked.svg'
+import duplicateIcon from '../assets/duplicate.svg'
+import deleteIcon    from '../assets/delete-x.svg'
+import groupIcon     from '../assets/group.svg'
+import aPlusIcon     from '../assets/A+.svg'
+import aMinusIcon    from '../assets/A-.svg'
+import editIcon      from '../assets/rename-edit.svg'
+import titleIcon     from '../assets/title.svg'
+import colorIcon     from '../assets/color.svg'
 
 // ── Panel definitions ─────────────────────────────────────────────────────────
 
@@ -67,10 +77,10 @@ export const PANEL_DEFS = {
 
 // ── Reusable action descriptors ───────────────────────────────────────────────
 
-const LOCK   = { id: 'lock',   label: el => el.locked ? 'Locked' : 'Lock', icon: el => el.locked ? '🔒' : '🔓', action: 'onLock',      active:  el => !!el.locked }
-const GROUP  = { id: 'group',  label: 'Group',  icon: '⊞', action: 'onGroup',     visible: el => !el.locked }
-const DUP    = { id: 'dup',    label: 'Dup',    icon: '⧉', action: 'onDuplicate' }
-const DELETE = { id: 'delete', label: 'Delete', icon: '×', action: 'onDelete',    danger:  true, visible: el => !el.locked }
+const LOCK   = { id: 'lock',   label: el => el.locked ? 'Locked' : 'Lock', img: el => el.locked ? lockedIcon : unlockedIcon, icon: el => el.locked ? '🔒' : '🔓', action: 'onLock', active: el => !!el.locked }
+const GROUP  = { id: 'group',  label: 'Group',  img: groupIcon, icon: '⊞', action: 'onGroup', visible: el => !el.locked }
+const DUP    = { id: 'dup',    label: 'Dup',    img: duplicateIcon, icon: '⧉', action: 'onDuplicate' }
+const DELETE = { id: 'delete', label: 'Delete', img: deleteIcon, icon: '×', action: 'onDelete', danger: true, visible: el => !el.locked }
 
 const SEP    = { id: '__sep__', sep: true }
 
@@ -81,17 +91,17 @@ const COMMON = [LOCK, GROUP, DUP, DELETE]
 
 export const TOOLBAR_CONFIG = {
   image: [
-    { id: 'caption',  label: 'Caption', icon: '✏',
+    { id: 'caption',  label: 'Caption', img: editIcon, icon: '✏',
       panel: 'caption', initText: el => el?.content?.caption ?? '' },
     SEP,
     ...COMMON,
   ],
 
   idea: [
-    { id: 'edit',    label: 'Edit',  icon: '✏', action: 'onEdit', visible: el => !el.locked },
-    { id: 'fontDown', label: 'Smaller', icon: 'A−', action: 'onFontSmaller', visible: el => !el.locked },
-    { id: 'fontUp',   label: 'Bigger',  icon: 'A+', action: 'onFontBigger',  visible: el => !el.locked },
-    { id: 'title',   label: 'Title', icon: 'T',
+    { id: 'edit',    label: 'Edit',  img: editIcon, icon: '✏', action: 'onEdit', visible: el => !el.locked },
+    { id: 'fontDown', label: 'Smaller', img: aMinusIcon, icon: 'A−', action: 'onFontSmaller', visible: el => !el.locked },
+    { id: 'fontUp',   label: 'Bigger',  img: aPlusIcon, icon: 'A+', action: 'onFontBigger',  visible: el => !el.locked },
+    { id: 'title',   label: 'Title', img: titleIcon, icon: 'T',
       panel: 'title', initText: el => el?.content?.title ?? '' },
     { id: 'bgColor', label: 'Color',
       iconStyle: el => ({
@@ -105,7 +115,7 @@ export const TOOLBAR_CONFIG = {
   ],
 
   todo: [
-    { id: 'title',    label: 'Title', icon: 'T',
+    { id: 'title',    label: 'Title', img: titleIcon, icon: 'T',
       panel: 'title', initText: el => el?.content?.title ?? '' },
     SEP,
     ...COMMON,
@@ -114,7 +124,7 @@ export const TOOLBAR_CONFIG = {
   palette: COMMON,
 
   link: [
-    { id: 'edit', label: 'Edit', icon: '✏', action: 'onEdit', visible: el => !el.locked },
+    { id: 'edit', label: 'Edit', img: editIcon, icon: '✏', action: 'onEdit', visible: el => !el.locked },
     SEP,
     ...COMMON,
   ],
@@ -122,8 +132,8 @@ export const TOOLBAR_CONFIG = {
   document: COMMON,
 
   collection: [
-    { id: 'rename', label: 'Rename', icon: '✏', action: 'onRename', visible: el => !el.locked },
-    { id: 'color',  label: 'Color',  icon: '🎨', panel: 'colColor', visible: el => !el.locked },
+    { id: 'rename', label: 'Rename', img: editIcon, icon: '✏', action: 'onRename', visible: el => !el.locked },
+    { id: 'color',  label: 'Color',  img: colorIcon, icon: '🎨', panel: 'colColor', visible: el => !el.locked },
     SEP,
     LOCK,
     DUP,

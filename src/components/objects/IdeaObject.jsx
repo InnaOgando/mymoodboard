@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import ResizeHandle from '../ResizeHandle'
 import { supabase } from '../../supabase'
+import micIcon from '../../assets/microphone.svg'
 
 // Records audio (works reliably inside the iOS WKWebView, unlike Web Speech API)
 // then sends it to the Netlify transcribe function -> OpenAI gpt-4o-transcribe.
@@ -140,7 +141,7 @@ export default function IdeaObject({ el, selected, editing, onUpdate, onResize, 
               onClick={e => { e.stopPropagation(); handleMic() }}
               disabled={transcribing}
               title={transcribing ? 'Transcribing…' : listening ? 'Stop recording' : 'Speak'}
-            >{transcribing ? '⏳' : listening ? '⏹' : '🎙'}</button>
+            >{transcribing ? '⏳' : listening ? '⏹' : <img src={micIcon} alt="Speak" className="idea-mic-icon" />}</button>
           )}
           {listening && <span className="listening-dot" title="Recording…" />}
         </div>

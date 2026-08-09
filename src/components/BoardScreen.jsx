@@ -277,9 +277,13 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
   }
 
   async function updateContent(id, content) {
-    setElements(prev => prev.map(el => el.id === id ? { ...el, content } : el))
-    const el = elementsRef.current.find(e => e.id === id)
-    if (el) await saveElement({ ...el, content })
+    // Build from the ref and sync it eagerly so a save that fires immediately
+    // after (e.g. auto-resize) reads this fresh state instead of clobbering it.
+    const next = elementsRef.current.map(el => el.id === id ? { ...el, content } : el)
+    elementsRef.current = next
+    setElements(next)
+    const el = next.find(e => e.id === id)
+    if (el) await saveElement(el)
   }
 
   async function removeElement(id) {
@@ -309,9 +313,13 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
   }
 
   async function resizeElement(id, w, h) {
-    setElements(prev => prev.map(el => el.id === id ? { ...el, w, h } : el))
-    const el = elementsRef.current.find(e => e.id === id)
-    if (el) await saveElement({ ...el, w, h })
+    // Merge w/h onto the freshest element (never a stale snapshot), so a resize
+    // that lands right after a content update can't overwrite the new content.
+    const next = elementsRef.current.map(el => el.id === id ? { ...el, w, h } : el)
+    elementsRef.current = next
+    setElements(next)
+    const el = next.find(e => e.id === id)
+    if (el) await saveElement(el)
   }
 
   // ── Collection operations ───────────────────────────────────────────────────

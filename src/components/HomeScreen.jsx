@@ -6,6 +6,11 @@ import { supabase } from '../supabase'
 import Canvas from './Canvas'
 import DraggableCard from './DraggableCard'
 import { PRESET_COLORS } from '../colors'
+import backupIcon  from '../assets/backup.svg'
+import restoreIcon from '../assets/restore.svg'
+import exitIcon    from '../assets/exit.svg'
+import renameIcon  from '../assets/rename-edit.svg'
+import colorIcon   from '../assets/color.svg'
 
 function randomColor() {
   return PRESET_COLORS[Math.floor(Math.random() * PRESET_COLORS.length)]
@@ -251,7 +256,7 @@ export default function HomeScreen({ onOpenBoard, session }) {
             <span className="storage-meter-label">{Math.round(usage.bytes / 1048576)}/150 MB</span>
           </div>
           <button className="logout-btn" title="Backup / Restore" onClick={() => setBackupMenuOpen(true)}>⋯</button>
-          <button className="logout-btn" title="Sign out" onClick={() => supabase.auth.signOut()}>↪</button>
+          <button className="logout-btn" title="Sign out" onClick={() => supabase.auth.signOut()}><img className="btn-icon-img" src={exitIcon} alt="Sign out" /></button>
         </div>
       </header>
 
@@ -299,8 +304,8 @@ export default function HomeScreen({ onOpenBoard, session }) {
           <div className="modal" onClick={e => e.stopPropagation()}>
             <h3 style={{ marginBottom: 4 }}>Backup</h3>
             <div className="board-menu-list">
-              <button className="board-menu-item" disabled={busy} onClick={handleExport}>⬇︎ Export my data</button>
-              <button className="board-menu-item" disabled={busy} onClick={() => importRef.current?.click()}>⬆︎ Restore from backup</button>
+              <button className="board-menu-item" disabled={busy} onClick={handleExport}><img className="menu-icon-img" src={backupIcon} alt="" /> Export my data</button>
+              <button className="board-menu-item" disabled={busy} onClick={() => importRef.current?.click()}><img className="menu-icon-img" src={restoreIcon} alt="" /> Restore my data</button>
             </div>
             <p style={{ fontSize: '0.75rem', color: 'var(--muted)', marginTop: 10, lineHeight: 1.4 }}>
               Includes all your boards, notes and images in a single file. Save it on your computer.
@@ -353,13 +358,13 @@ export default function HomeScreen({ onOpenBoard, session }) {
                 setRenameValue(selectedBoard.name)
                 setShowRename(true)
               }}>
-                ✎ Rename Board
+                <img className="menu-icon-img" src={renameIcon} alt="" /> Rename Board
               </button>
               <button className="board-menu-item" onClick={() => {
                 setBoardMenuOpen(false)
                 setShowColorPicker(true)
               }}>
-                ● Change Board Color
+                <img className="menu-icon-img" src={colorIcon} alt="" /> Change Board Color
               </button>
               <button className="board-menu-item board-menu-danger" onClick={() => {
                 setBoardMenuOpen(false)

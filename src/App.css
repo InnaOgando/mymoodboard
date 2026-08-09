@@ -650,7 +650,7 @@ input, textarea, [contenteditable="true"] {
   font-size: 0.95rem;
   cursor: pointer;
   text-align: left;
-  color: var(--text);
+  color: #808285;
   font-family: inherit;
   font-weight: 500;
   transition: background 0.12s;
@@ -1477,26 +1477,49 @@ input, textarea, [contenteditable="true"] {
 .bottom-nav.obj-toolbar {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
-  overflow: hidden;
+  justify-content: space-between;
+  overflow: visible;            /* let the More popup escape the bar */
   gap: 0;
   padding: 0 4px;
 }
-.obj-toolbar-scroll {
+.obj-toolbar-main   { display: flex; align-items: center; }
+.obj-toolbar-pinned { display: flex; align-items: center; flex: 0 0 auto; }
+
+/* More ▾ overflow menu */
+.obj-more-wrap { position: relative; display: flex; }
+.obj-more-pop {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.20);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 190px;
+  z-index: 600;
+}
+.obj-more-item {
   display: flex;
   align-items: center;
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
+  gap: 12px;
+  background: none;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  color: var(--text);
+  font-size: 0.95rem;
+  text-align: left;
 }
-.obj-toolbar-scroll::-webkit-scrollbar { display: none; }
-.obj-toolbar-pinned {
-  display: flex;
-  align-items: center;
-  flex: 0 0 auto;
-}
+.obj-more-item:hover  { background: var(--border-light); }
+.obj-more-item:active { background: var(--border); }
+.obj-more-item .ft-icon { font-size: 1.1rem; width: 20px; text-align: center; }
+.obj-more-label { line-height: 1; }
+.obj-more-div { height: 1px; background: var(--border); margin: 4px 6px; }
 
 /* Panel that appears above the button row inside the bottom bar */
 .obj-panel {
@@ -1881,3 +1904,10 @@ input, textarea, [contenteditable="true"] {
   cursor: pointer;
   padding: 0 4px;
 }
+
+.idea-mic-icon { width: 16px; height: 16px; object-fit: contain; display: block; }
+
+.ft-icon-img { width: 18px; height: 18px; object-fit: contain; display: block; }
+
+.menu-icon-img { width: 20px; height: 20px; object-fit: contain; flex: 0 0 auto; }
+.btn-icon-img  { width: 20px; height: 20px; object-fit: contain; display: block; }

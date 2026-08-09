@@ -40,6 +40,7 @@ export default function BoardToolbar({
 }) {
   const [panel, setPanel]         = useState(null)
   const [panelText, setPanelText] = useState('')
+  const [moreOpen, setMoreOpen]   = useState(false)
 
   // ── Select mode → slim selection bar (count · cancel · delete) ──────────────
   if (selectMode) {
@@ -187,10 +188,29 @@ export default function BoardToolbar({
         </div>
       )}
 
-      {/* Button row — most-used actions (Lock, Delete) pinned right; rest scrolls */}
+      {/* Button row — secondary tools collapse into "More"; Lock/Delete pinned right */}
       <div className="bottom-nav obj-toolbar">
-        <div className="obj-toolbar-scroll">
-          {scrollItems.map(renderItem)}
+        <div className="obj-toolbar-main">
+          {scrollItems.some(i => !i.sep) && (
+            <div className="obj-more-wrap">
+              {moreOpen && (
+                <div className="obj-more-pop">
+                  {scrollItems.map(item =>
+                    item.sep
+                      ? <div key={item.id} className="obj-more-div" />
+                      : renderMoreItem(item)
+                  )}
+                </div>
+              )}
+              <button
+                className={`ft-btn ${moreOpen ? 'ft-btn--active' : ''}`}
+                onClick={() => { setPanel(null); setMoreOpen(o => !o) }}
+              >
+                <span className="ft-icon">☰</span>
+                <span className="ft-label">More {moreOpen ? '▴' : '▾'}</span>
+              </button>
+            </div>
+          )}
         </div>
         {pinnedItems.length > 0 && (
           <div className="obj-toolbar-pinned">
@@ -202,11 +222,38 @@ export default function BoardToolbar({
     </div>
   )
 
+  // A tool rendered as a row inside the More popup. Font +/- keep the popup open
+  // for repeat taps; everything else (actions, panels) closes it on select.
+  function renderMoreItem(item) {
+    const label    = resolve(item.label, selectedEl)
+    const icon     = resolve(item.icon,  selectedEl)
+    const img      = item.img ? resolve(item.img, selectedEl) : null
+    const iconSt   = item.iconStyle ? item.iconStyle(selectedEl) : null
+    const isActive = (item.active && item.active(selectedEl)) || panel === item.panel
+    const keepOpen = item.id === 'fontUp' || item.id === 'fontDown'
+    return (
+      <button
+        key={item.id}
+        className={['obj-more-item', item.danger ? 'ft-btn--danger' : '', isActive ? 'ft-btn--active' : ''].filter(Boolean).join(' ')}
+        onClick={() => { handleItemClick(item); if (!keepOpen) setMoreOpen(false) }}
+      >
+        {img
+          ? <img src={img} alt="" className="ft-icon-img" />
+          : iconSt
+            ? <span className="ft-icon" style={iconSt} />
+            : <span className="ft-icon">{icon}</span>
+        }
+        <span className="obj-more-label">{label}</span>
+      </button>
+    )
+  }
+
   function renderItem(item) {
     if (item.sep) return <div key={item.id} className="ft-sep" />
 
     const label    = resolve(item.label, selectedEl)
     const icon     = resolve(item.icon,  selectedEl)
+    const img      = item.img ? resolve(item.img, selectedEl) : null
     const iconSt   = item.iconStyle ? item.iconStyle(selectedEl) : null
     const isActive = (item.active && item.active(selectedEl)) || panel === item.panel
 
@@ -220,9 +267,11 @@ export default function BoardToolbar({
         ].filter(Boolean).join(' ')}
         onClick={() => handleItemClick(item)}
       >
-        {iconSt
-          ? <span className="ft-icon" style={iconSt} />
-          : <span className="ft-icon">{icon}</span>
+        {img
+          ? <img src={img} alt="" className="ft-icon-img" />
+          : iconSt
+            ? <span className="ft-icon" style={iconSt} />
+            : <span className="ft-icon">{icon}</span>
         }
         <span className="ft-label">{label}</span>
       </button>
