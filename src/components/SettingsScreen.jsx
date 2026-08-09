@@ -39,19 +39,21 @@ export default function SettingsScreen({ session, usage, onClose, onExport, onRe
           />
         : view === 'help'
         ? <HelpView onBack={() => setView('main')} onClose={onClose} />
+        : view === 'privacy'
+        ? <PrivacyView onBack={() => setView('main')} onClose={onClose} />
         : <MainView
             name={name} email={email} initials={initials(name, email)}
             mb={mb} limitMb={limitMb} ratio={ratio}
             onClose={onClose} onExport={onExport} onRestore={onRestore}
             onSignOut={onSignOut} onAccount={() => setView('account')}
-            onHelp={() => setView('help')}
+            onHelp={() => setView('help')} onPrivacy={() => setView('privacy')}
           />
       }
     </div>
   )
 }
 
-function MainView({ name, email, initials, mb, limitMb, ratio, onClose, onExport, onRestore, onSignOut, onAccount, onHelp }) {
+function MainView({ name, email, initials, mb, limitMb, ratio, onClose, onExport, onRestore, onSignOut, onAccount, onHelp, onPrivacy }) {
   return (
     <>
       <div className="settings-topbar">
@@ -85,7 +87,7 @@ function MainView({ name, email, initials, mb, limitMb, ratio, onClose, onExport
         <div className="settings-list">
           <button className="settings-row" onClick={onExport}>
             <img className="settings-row-icon" src={backupIcon} alt="" />
-            <span>Export my data</span>
+            <span>Back up my data</span>
           </button>
           <button className="settings-row" onClick={onRestore}>
             <img className="settings-row-icon" src={restoreIcon} alt="" />
@@ -94,10 +96,10 @@ function MainView({ name, email, initials, mb, limitMb, ratio, onClose, onExport
         </div>
 
         <div className="settings-list">
-          <a className="settings-row" href={PRIVACY_URL} target="_blank" rel="noreferrer">
+          <button className="settings-row" onClick={onPrivacy}>
             <span>Privacy Policy</span>
             <span className="settings-chevron">&#8250;</span>
-          </a>
+          </button>
           <a className="settings-row" href={TERMS_URL} target="_blank" rel="noreferrer">
             <span>Terms of Use</span>
             <span className="settings-chevron">&#8250;</span>
@@ -293,6 +295,48 @@ function HelpView({ onBack, onClose }) {
             <span className="settings-chevron">&#8250;</span>
           </a>
         </div>
+      </div>
+    </>
+  )
+}
+
+
+function PrivacyView({ onBack, onClose }) {
+  return (
+    <>
+      <div className="settings-topbar">
+        <button className="settings-back" onClick={onBack}>&#8249;</button>
+        <span className="settings-title">Privacy Policy</span>
+        <button className="settings-done" onClick={onClose}>Done</button>
+      </div>
+
+      <div className="settings-scroll settings-policy">
+        <p className="settings-policy-updated"><strong>Last updated: July 28, 2026</strong></p>
+
+        <h3>What we collect</h3>
+        <p>RefMemo stores your boards, images, notes, links, and color palettes locally on your device. If you choose to enable sync, this data is also stored in a secure cloud database associated with your account.</p>
+        <p>We collect your email address when you create an account, solely to authenticate you and sync your data across devices.</p>
+
+        <h3>What we do not collect</h3>
+        <p>We do not collect analytics, usage data, crash reports, advertising identifiers, or any data beyond what is needed to provide the app&apos;s core functionality.</p>
+        <p>We do not sell, share, or transfer your data to any third party.</p>
+
+        <h3>Images and files</h3>
+        <p>Images you import are stored locally on your device. If sync is enabled, image data is uploaded to secure cloud storage accessible only to your account.</p>
+
+        <h3>Data storage</h3>
+        <p>Cloud sync uses <strong>Supabase</strong>, hosted on infrastructure that complies with standard security practices. Your data is stored securely and is not shared with other users.</p>
+
+        <h3>Your rights</h3>
+        <p>You can delete your account and all associated data at any time from within the app. Deleting the app removes all local data from your device.</p>
+
+        <h3>Children</h3>
+        <p>RefMemo is not directed at children under 13. We do not knowingly collect information from children.</p>
+
+        <h3>Contact</h3>
+        <p>Questions about this policy? Reach us at <strong>{SUPPORT_EMAIL}</strong></p>
+
+        <p className="settings-policy-footer">&copy; 2026 RefMemo. All rights reserved.</p>
       </div>
     </>
   )

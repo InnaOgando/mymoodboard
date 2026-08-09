@@ -1977,7 +1977,7 @@ input, textarea, [contenteditable="true"] {
 .settings-list .settings-row:last-child { border-bottom: none; }
 .settings-row:hover { background: var(--border-light); }
 .settings-row-icon { width: 20px; height: 20px; object-fit: contain; flex: 0 0 auto; }
-.settings-row span:not(.settings-chevron) { flex: 1; }
+.settings-row span:not(.settings-chevron):not(.settings-help-q) { flex: 1; }
 .settings-chevron { color: var(--muted); font-size: 1.2rem; }
 .settings-row--accent { color: var(--accent); font-weight: 600; }
 
@@ -2036,3 +2036,10 @@ input, textarea, [contenteditable="true"] {
   color: var(--muted); font-size: 0.9rem; line-height: 1.5;
   padding: 0 16px 14px; margin: 0;
 }
+
+/* In-app policy text */
+.settings-policy h3 { font-size: 0.98rem; font-weight: 700; color: var(--text); margin: 22px 0 6px; }
+.settings-policy p { color: var(--muted); font-size: 0.92rem; line-height: 1.6; margin-bottom: 8px; }
+.settings-policy strong { color: var(--text); }
+.settings-policy-updated { margin-bottom: 18px; }
+.settings-policy-footer { margin-top: 32px; padding-top: 18px; border-top: 1px solid var(--border-light); font-size: 0.82rem; }
