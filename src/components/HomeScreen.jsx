@@ -6,11 +6,18 @@ import { supabase } from '../supabase'
 import Canvas from './Canvas'
 import DraggableCard from './DraggableCard'
 import { PRESET_COLORS } from '../colors'
+import SettingsScreen from './SettingsScreen'
 import backupIcon  from '../assets/backup.svg'
 import restoreIcon from '../assets/restore.svg'
-import exitIcon    from '../assets/exit.svg'
 import renameIcon  from '../assets/rename-edit.svg'
 import colorIcon   from '../assets/color.svg'
+
+function homeInitials(user) {
+  const src = (user?.user_metadata?.name || user?.email || '?').trim()
+  const parts = src.split(/[\s@._-]+/).filter(Boolean)
+  const letters = parts.length >= 2 ? parts[0][0] + parts[1][0] : src.slice(0, 2)
+  return letters.toUpperCase()
+}
 
 function randomColor() {
   return PRESET_COLORS[Math.floor(Math.random() * PRESET_COLORS.length)]
@@ -191,6 +198,7 @@ export default function HomeScreen({ onOpenBoard, session }) {
   }, [])
 
   const [backupMenuOpen, setBackupMenuOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [backupTip, setBackupTip] = useState(false)
   const [busy, setBusy] = useState(false)
   const importRef = useRef()
@@ -255,8 +263,7 @@ export default function HomeScreen({ onOpenBoard, session }) {
             </div>
             <span className="storage-meter-label">{Math.round(usage.bytes / 1048576)}/150 MB</span>
           </div>
-          <button className="logout-btn" title="Backup / Restore" onClick={() => setBackupMenuOpen(true)}>⋯</button>
-          <button className="logout-btn" title="Sign out" onClick={() => supabase.auth.signOut()}><img className="btn-icon-img" src={exitIcon} alt="Sign out" /></button>
+          <button className="home-avatar-btn" title="Settings" onClick={() => setSettingsOpen(true)}>{homeInitials(session?.user)}</button>
         </div>
       </header>
 
@@ -297,6 +304,17 @@ export default function HomeScreen({ onOpenBoard, session }) {
       </div>
 
       <input ref={importRef} type="file" accept="application/json" style={{ display: 'none' }} onChange={handleImport} />
+
+      {settingsOpen && (
+        <SettingsScreen
+          session={session}
+          usage={usage}
+          onClose={() => setSettingsOpen(false)}
+          onExport={handleExport}
+          onRestore={() => importRef.current?.click()}
+          onSignOut={() => supabase.auth.signOut()}
+        />
+      )}
 
       {/* Backup menu */}
       {backupMenuOpen && (

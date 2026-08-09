@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../supabase'
+import logo from '../assets/icon.png'
 
 export default function AuthScreen() {
   const [mode, setMode] = useState('login') // 'login' | 'register' | 'reset'
@@ -45,7 +46,7 @@ export default function AuthScreen() {
   return (
     <div className="auth-screen">
       <div className="auth-card">
-        <div className="auth-logo">🗂</div>
+        <div className="auth-logo"><img src={logo} alt="RefMemo" className="auth-logo-img" /></div>
         <h1 className="auth-title">RefMemo</h1>
         <p className="auth-sub">Visual reference boards</p>
 
