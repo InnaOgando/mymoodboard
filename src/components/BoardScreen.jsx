@@ -819,7 +819,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
 
   async function handleFiles(files) {
     const imgs = Array.from(files).filter(f => f.type.startsWith('image/'))
-    const docs = Array.from(files).filter(f => f.type === 'application/pdf' || f.name.match(/\.(doc|docx)$/i))
+    const docs = Array.from(files).filter(f => f.type === 'application/pdf' || f.name.match(/\.(pdf|doc|docx)$/i))
     console.log('[placement] handleFiles imgs=' + imgs.length + ' docs=' + docs.length)
     const vp = getViewport()
 
@@ -899,7 +899,14 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
       setTimeout(() => setStorageMsg(null), 8000)
     }
     const heights = good.map(m => (m.width ? Math.round(IMG_W * m.height / m.width) : IMG_W))
-    if (good.length === 0) return
+    if (good.length === 0) {
+      // No images selected — still add any documents (the Doc button path), then stop.
+      for (const f of docs) {
+        const pos = findFreePosition(elementsRef.current, childBoardsRef.current, vp)
+        await addElement('document', pos, { name: f.name, type: f.type, src: await fileToBase64(f) })
+      }
+      return
+    }
 
     // Group images into rows of BULK_COLS.
     const rows = []
