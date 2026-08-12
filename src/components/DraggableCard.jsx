@@ -1,7 +1,7 @@
 import { useRef } from 'react'
 
 const INTERACTIVE = new Set(['INPUT', 'TEXTAREA', 'SELECT', 'A'])
-const DOUBLE_TAP_MS = 500
+const DOUBLE_TAP_MS = 600
 
 export default function DraggableCard({
   x, y, scaleRef, onMove, onTap, onDoubleTap, onDragStart, onDragMove, onDragEnd,

@@ -91,6 +91,7 @@ const COMMON = [LOCK, GROUP, DUP, DELETE]
 
 export const TOOLBAR_CONFIG = {
   image: [
+    { id: 'open',     label: 'Open',    icon: '⤢', action: 'onOpen' },
     { id: 'caption',  label: 'Caption', img: editIcon, icon: '✏',
       panel: 'caption', initText: el => el?.content?.caption ?? '' },
     SEP,

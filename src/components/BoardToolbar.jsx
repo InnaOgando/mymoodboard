@@ -121,7 +121,7 @@ export default function BoardToolbar({
 
   // Pin the most-used actions (Lock, Delete) to the right so they're always
   // reachable; everything else lives in the scrollable region.
-  const PINNED_IDS = ['lock', 'delete']
+  const PINNED_IDS = ['open', 'lock', 'delete']
   const pinnedItems = visibleItems.filter(i => PINNED_IDS.includes(i.id))
   const scrollItems = visibleItems.filter(i => !PINNED_IDS.includes(i.id))
   // Strip separators left dangling at the edges after pulling pinned items out.

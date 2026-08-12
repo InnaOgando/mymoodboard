@@ -1162,6 +1162,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
             onExitSelect={exitSelectMode}
             onDeleteSelected={deleteSelected}
             onAction={handleNavAction}
+            onOpen={() => { if (selEl) activateElement(selEl) }}
             onDelete={() => removeElement(selectedId)}
             onLock={() => toggleLock(selectedId)}
             onGroup={() => { if (selEl) makeCollection(selEl) }}
