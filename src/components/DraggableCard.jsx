@@ -133,9 +133,6 @@ export default function DraggableCard({
 
     if (moved.current && isDragging.current) {
       onDragEnd?.(lastPos.current.x, lastPos.current.y)
-    } else if (isDragging.current) {
-      // Long-press engaged (move mode) but released without moving — do NOT treat
-      // this as a tap/open. Long-press is for moving only; opening is double-tap.
     } else if (!moved.current) {
       // Double-tap: two quick taps on THIS card. The handler is per-card, so both
       // taps are already on the same element — no position check needed. Measured
@@ -149,7 +146,9 @@ export default function DraggableCard({
         // Always record the down time so a following tap can still pair into a double-tap (edit).
         const held = Date.now() - curDownTime.current
         lastTapDown.current = curDownTime.current
-        if (held >= tapMinMs) onTap?.()
+        // Pass whether a long-press was engaged, so the board can select only on
+        // long-press and ignore quick taps/grazes (no accidental selection).
+        if (held >= tapMinMs) onTap?.(isDragging.current)
       }
     }
     isDragging.current = false

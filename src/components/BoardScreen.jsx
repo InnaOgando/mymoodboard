@@ -1078,7 +1078,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
             onDragStart={() => handleObjectDragStart(el)}
             onDragMove={(nx, ny) => handleObjectDragMove(el, nx, ny)}
             onDragEnd={(nx, ny) => handleObjectDragEnd(el, nx, ny)}
-            onTap={() => {
+            onTap={(viaLongPress) => {
               // Select mode: tap toggles multi-selection instead of opening.
               if (selectMode) { toggleSelectId(el.id); return }
               // iOS short-drag fix: complete a pending drop onto a child board.
@@ -1096,15 +1096,12 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
                 dropIntoCollection(el, pendingColId)
                 return
               }
-              // Tap to select; tap again on the already-selected object opens it
-              // (reliable on touch). Double-tap below also works.
-              if (selectedId === el.id) {
-                activateElement(el)
-              } else {
-                setSelectedId(el.id)
-                setEditingId(null)
-                setSelectedBoardId(null)
-              }
+              // Only a LONG-PRESS selects. A quick tap / graze does nothing, so
+              // objects are never selected by accident. Opening is double-tap.
+              if (!viaLongPress) return
+              setSelectedId(el.id)
+              setEditingId(null)
+              setSelectedBoardId(null)
             }}
             onDoubleTap={() => { if (!selectMode) activateElement(el) }}
           >
