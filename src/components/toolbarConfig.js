@@ -91,7 +91,7 @@ const COMMON = [LOCK, GROUP, DUP, DELETE]
 
 export const TOOLBAR_CONFIG = {
   image: [
-    { id: 'open',     label: 'Open',    icon: '⤢', action: 'onOpen' },
+    { id: 'open',     label: 'Preview', icon: '⤢', action: 'onOpen' },
     { id: 'caption',  label: 'Caption', img: editIcon, icon: '✏',
       panel: 'caption', initText: el => el?.content?.caption ?? '' },
     SEP,
@@ -133,6 +133,7 @@ export const TOOLBAR_CONFIG = {
   document: COMMON,
 
   collection: [
+    { id: 'open',   label: 'Preview', icon: '⤢', action: 'onOpen' },
     { id: 'rename', label: 'Rename', img: editIcon, icon: '✏', action: 'onRename', visible: el => !el.locked },
     { id: 'color',  label: 'Color',  img: colorIcon, icon: '🎨', panel: 'colColor', visible: el => !el.locked },
     SEP,

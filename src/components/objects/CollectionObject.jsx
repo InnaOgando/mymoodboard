@@ -120,19 +120,6 @@ export default function CollectionObject({
         <div className="col-header drag-handle" style={{ background: accentColor ? `${accentColor}1a` : undefined }}>
           <span className="col-header-icon" />
           <span className="col-header-title">{label}</span>
-          <button
-            className="col-expand"
-            onPointerDown={e => e.stopPropagation()}
-            onPointerUp={e => e.stopPropagation()}
-            onClick={e => { e.stopPropagation(); onOpen?.() }}
-            title="Open collection"
-            aria-label="Open collection"
-          >
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M8 4H5a1 1 0 0 0-1 1v3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3" />
-            </svg>
-            <span className="col-expand-label">Open</span>
-          </button>
         </div>
 
         {items.length === 0 ? (
