@@ -997,7 +997,7 @@ input, textarea, [contenteditable="true"] {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 12px 12px 11px;
+  padding: 12px 68px 11px 12px;   /* reserve room on the right for the Open button */
   border-bottom: 1px solid #d8d8d8;
   cursor: grab;
   position: relative;
@@ -1007,19 +1007,21 @@ input, textarea, [contenteditable="true"] {
   right: 6px;
   top: 50%;
   transform: translateY(-50%);
-  width: 28px;
-  height: 28px;
+  height: 26px;
   display: flex;
   align-items: center;
-  justify-content: center;
-  background: none;
-  border: none;
-  border-radius: 7px;
-  color: var(--muted);
+  gap: 5px;
+  background: var(--border-light);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
   cursor: pointer;
-  padding: 0;
+  padding: 0 10px 0 8px;
+  font-size: 0.78rem;
+  font-weight: 600;
 }
-.col-expand:hover { background: var(--border-light); color: var(--text); }
+.col-expand-label { line-height: 1; }
+.col-expand:hover { background: var(--border); }
 .col-header:active { cursor: grabbing; }
 
 .col-header-icon {

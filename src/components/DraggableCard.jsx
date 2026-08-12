@@ -133,6 +133,9 @@ export default function DraggableCard({
 
     if (moved.current && isDragging.current) {
       onDragEnd?.(lastPos.current.x, lastPos.current.y)
+    } else if (isDragging.current) {
+      // Long-press engaged (move mode) but released without moving — do NOT treat
+      // this as a tap/open. Long-press is for moving only; opening is double-tap.
     } else if (!moved.current) {
       // Double-tap: two quick taps on THIS card. The handler is per-card, so both
       // taps are already on the same element — no position check needed. Measured
