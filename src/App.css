@@ -301,9 +301,14 @@ input, textarea, [contenteditable="true"] {
   font-weight: 600;
   color: var(--text);
   max-width: 110px;
+  text-align: center;
+  line-height: 1.2;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  white-space: normal;
+  overflow-wrap: break-word;
 }
 
 /* ── Element cards ── */
