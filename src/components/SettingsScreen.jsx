@@ -12,7 +12,7 @@ const PRIVACY_URL = '/privacy-policy'
 // Apple's standard EULA — swap for your own Terms page when you have one.
 const TERMS_URL   = 'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/'
 // TODO: replace with your dedicated support email once created.
-const SUPPORT_EMAIL = 'yaskii.ill@gmail.com'
+const SUPPORT_EMAIL = 'help.refmemo@icloud.com'
 
 function initials(name, email) {
   const src = (name || email || '?').trim()
