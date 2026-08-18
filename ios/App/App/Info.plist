@@ -47,5 +47,13 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>NSCameraUsageDescription</key>
+	<string>RefMemo uses the camera so you can add photos to your reference boards.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>RefMemo needs access to your photo library so you can add images to your boards.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>RefMemo uses the microphone to turn your spoken notes into text on idea cards.</string>
 </dict>
 </plist>

@@ -57,7 +57,7 @@ input, textarea, [contenteditable="true"] {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 4px 10px;
+  padding: calc(4px + env(safe-area-inset-top, 0px)) 10px 4px;
   background: var(--surface);
   border-bottom: 1px solid var(--border-light);
   z-index: 10;

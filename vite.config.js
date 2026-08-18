@@ -35,6 +35,8 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,png,svg,ico,webp,woff2}'],
+        // Let the static privacy page load instead of the SPA shell
+        navigateFallbackDenylist: [/^\/privacy-policy/],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/iunqiswpbqijkqylfrll\.supabase\.co\/storage\/.*/i,
