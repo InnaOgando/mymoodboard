@@ -122,7 +122,11 @@ export const TOOLBAR_CONFIG = {
     ...COMMON,
   ],
 
-  palette: COMMON,
+  palette: [
+    { id: 'edit', label: 'Color', img: colorIcon, icon: '🎨', action: 'onEdit', visible: el => !el.locked },
+    SEP,
+    ...COMMON,
+  ],
 
   link: [
     { id: 'edit', label: 'Edit', img: editIcon, icon: '✏', action: 'onEdit', visible: el => !el.locked },

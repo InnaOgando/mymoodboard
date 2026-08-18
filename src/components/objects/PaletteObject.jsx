@@ -19,17 +19,25 @@ function isLightColor(hex) {
 
 const SWATCH_SIZE = 90
 
-export default function PaletteObject({ el, selected, onUpdate, onResize, scaleRef }) {
+export default function PaletteObject({ el, selected, editing, onUpdate, onResize, scaleRef }) {
   const colors = getPaletteColors(el.content)
   const [activeIdx, setActiveIdx] = useState(0)
   const [copiedIdx, setCopiedIdx] = useState(null)
-  // Capture selection state at touch-start so the synthesised click cannot open
-  // the picker if React re-rendered (selected→true) before the click fires.
-  const selectedAtTouchStart = useRef(false)
+  const lastTapRef = useRef({})
+  const inputRefs = useRef({})
   const idx = Math.min(activeIdx, colors.length - 1)
   const size = el.w || SWATCH_SIZE
   const hexScale = Math.min(4, Math.max(0.6, size / SWATCH_SIZE))
   const w = size * colors.length + 6 * (colors.length - 1)
+
+  // Not in edit mode: a double-tap on a swatch opens its colour picker directly.
+  function handleSwatch(i) {
+    setActiveIdx(i)
+    const now = Date.now()
+    const prev = lastTapRef.current[i] || 0
+    lastTapRef.current[i] = now
+    if (!editing && now - prev < 400) inputRefs.current[i]?.click()
+  }
 
   function changeColor(i, hex) {
     onUpdate({ ...el.content, colors: colors.map((c, ci) => ci === i ? hex : c) })
@@ -37,7 +45,7 @@ export default function PaletteObject({ el, selected, onUpdate, onResize, scaleR
 
   return (
     <div style={{ position: 'relative', width: w }}>
-      <div className={`el-palette-row ${selected ? 'selected' : ''}`}>
+      <div className={`el-palette-row ${selected ? 'selected' : ''} ${editing ? 'editing' : ''}`}>
         {colors.map((color, i) => {
           const light = isLightColor(color)
           return (
@@ -45,15 +53,14 @@ export default function PaletteObject({ el, selected, onUpdate, onResize, scaleR
               <div
                 className={`palette-swatch-sq ${light ? 'palette-swatch-sq--light' : ''} ${i === idx ? 'active' : ''}`}
                 style={{ background: color, width: size, height: size }}
-                onPointerDown={() => { selectedAtTouchStart.current = selected }}
-                onClick={() => setActiveIdx(i)}
+                onClick={() => handleSwatch(i)}
               >
                 <input
+                  ref={node => { inputRefs.current[i] = node }}
                   type="color"
                   value={color}
                   className="palette-color-input-hidden"
-                  style={{ pointerEvents: selected ? 'auto' : 'none' }}
-                  onClick={e => { if (!selectedAtTouchStart.current) { e.preventDefault(); return } setActiveIdx(i) }}
+                  style={{ pointerEvents: editing ? 'auto' : 'none' }}
                   onChange={e => { setActiveIdx(i); changeColor(i, e.target.value) }}
                 />
               </div>
@@ -71,6 +78,8 @@ export default function PaletteObject({ el, selected, onUpdate, onResize, scaleR
           )
         })}
       </div>
+
+      {editing && <div className="palette-edit-hint">Tap a colour to change</div>}
 
       {selected && (
         <ResizeHandle w={size} h={null} onResize={nw => onResize(nw, null)} minW={50} scaleRef={scaleRef} />
