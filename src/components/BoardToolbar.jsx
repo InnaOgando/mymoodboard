@@ -16,8 +16,18 @@ const CREATE_LEFT = [
 ]
 const CREATE_RIGHT = [
   { type: 'todo',     icon: todoIcon,  label: 'To Do' },
-  { type: 'image',    icon: imageIcon, label: 'Image' },
   { type: 'document', icon: docsIcon,  label: 'Doc' },
+]
+
+// Full object menu, opened from the + Add button.
+const CREATE_ALL = [
+  { type: 'board',    icon: collectionIcon, label: 'Board' },
+  { type: 'image',    icon: imageIcon,      label: 'Image' },
+  { type: 'idea',     icon: textIcon,       label: 'Idea' },
+  { type: 'link',     icon: linkIcon,       label: 'Link' },
+  { type: 'palette',  icon: colorIcon,      label: 'Palette' },
+  { type: 'todo',     icon: todoIcon,       label: 'To Do' },
+  { type: 'document', icon: docsIcon,       label: 'Doc' },
 ]
 
 /**
@@ -41,6 +51,7 @@ export default function BoardToolbar({
   const [panel, setPanel]         = useState(null)
   const [panelText, setPanelText] = useState('')
   const [moreOpen, setMoreOpen]   = useState(false)
+  const [addOpen, setAddOpen]     = useState(false)
 
   // ── Select mode → slim selection bar (count · cancel · delete) ──────────────
   if (selectMode) {
@@ -66,23 +77,23 @@ export default function BoardToolbar({
     return (
       <div className="bottom-bar board-bottom" onPointerDown={e => e.stopPropagation()}>
         <div className="bottom-nav create-nav">
-          <div className="create-tools">
-            {CREATE_LEFT.map(item => (
-              <button key={item.type} className="nav-btn" onClick={() => onAction(item.type)}>
-                <img src={item.icon} alt={item.label} className="nav-icon-img" />
-                <span className="nav-label">{item.label}</span>
-              </button>
-            ))}
-            <button className="add-board-btn center-btn" onClick={() => onAction('board')}>
-              <img src={collectionIcon} alt="Board" className="nav-icon-img" />
-              <span>Board</span>
+          <div className="create-add-wrap">
+            {addOpen && <div className="create-add-backdrop" onClick={() => setAddOpen(false)} />}
+            {addOpen && (
+              <div className="create-add-pop">
+                {CREATE_ALL.map(item => (
+                  <button key={item.type} className="create-add-item"
+                    onClick={() => { onAction(item.type); setAddOpen(false) }}>
+                    <img src={item.icon} alt="" className="create-add-icon" />
+                    <span>{item.label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            <button className={`create-add-btn ${addOpen ? 'open' : ''}`} onClick={() => setAddOpen(o => !o)}>
+              <span className="create-add-plus">+</span>
+              <span>Add</span>
             </button>
-            {CREATE_RIGHT.map(item => (
-              <button key={item.type} className="nav-btn" onClick={() => onAction(item.type)}>
-                <img src={item.icon} alt={item.label} className="nav-icon-img" />
-                <span className="nav-label">{item.label}</span>
-              </button>
-            ))}
           </div>
           <button className="nav-btn nav-btn--select" onClick={onEnterSelect}>
             <svg className="nav-icon-img" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

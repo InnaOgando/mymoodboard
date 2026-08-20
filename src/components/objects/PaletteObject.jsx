@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import ResizeHandle from '../ResizeHandle'
 
 // Backward compat: old `color` type used { color: '#hex' }
@@ -23,21 +23,10 @@ export default function PaletteObject({ el, selected, editing, onUpdate, onResiz
   const colors = getPaletteColors(el.content)
   const [activeIdx, setActiveIdx] = useState(0)
   const [copiedIdx, setCopiedIdx] = useState(null)
-  const lastTapRef = useRef({})
-  const inputRefs = useRef({})
   const idx = Math.min(activeIdx, colors.length - 1)
   const size = el.w || SWATCH_SIZE
   const hexScale = Math.min(4, Math.max(0.6, size / SWATCH_SIZE))
   const w = size * colors.length + 6 * (colors.length - 1)
-
-  // Not in edit mode: a double-tap on a swatch opens its colour picker directly.
-  function handleSwatch(i) {
-    setActiveIdx(i)
-    const now = Date.now()
-    const prev = lastTapRef.current[i] || 0
-    lastTapRef.current[i] = now
-    if (!editing && now - prev < 400) inputRefs.current[i]?.click()
-  }
 
   function changeColor(i, hex) {
     onUpdate({ ...el.content, colors: colors.map((c, ci) => ci === i ? hex : c) })
@@ -53,10 +42,9 @@ export default function PaletteObject({ el, selected, editing, onUpdate, onResiz
               <div
                 className={`palette-swatch-sq ${light ? 'palette-swatch-sq--light' : ''} ${i === idx ? 'active' : ''}`}
                 style={{ background: color, width: size, height: size }}
-                onClick={() => handleSwatch(i)}
+                onClick={() => setActiveIdx(i)}
               >
                 <input
-                  ref={node => { inputRefs.current[i] = node }}
                   type="color"
                   value={color}
                   className="palette-color-input-hidden"

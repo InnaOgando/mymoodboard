@@ -15,6 +15,7 @@ import { PRESET_COLORS, readableTextColor } from '../colors'
 const randomColor = () => PRESET_COLORS[Math.floor(Math.random() * PRESET_COLORS.length)]
 import ImagePreview from './ImagePreview'
 import CollectionGallery from './CollectionGallery'
+import DocumentPreview from './DocumentPreview'
 
 // ── Viewport-aware placement ──────────────────────────────────────────────────
 // Computes the current visible canvas area so new objects always land in view.
@@ -106,6 +107,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
   const [storageMsg, setStorageMsg] = useState(null)
   const [previewEl, setPreviewEl] = useState(null)       // image preview modal
   const [galleryEl, setGalleryEl] = useState(null)       // collection gallery modal
+  const [docPreviewEl, setDocPreviewEl] = useState(null) // in-app document viewer
 
   // Ref mirrors for state used inside async callbacks / event handlers
   const elementsRef = useRef([])
@@ -467,7 +469,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
     try {
       const items = getCollectionItems(col.content)
       const newItem = { id: uid(), type: objectEl.type, content: objectEl.content, w: objectEl.w, h: objectEl.h }
-      const updated = { ...col, content: { items: [...items, newItem] } }
+      const updated = { ...col, content: { ...col.content, items: [...items, newItem] } }
       // Update UI immediately — do not await DB before showing the change
       setElements(prev => prev.filter(e => e.id !== objectEl.id).map(e => e.id === colId ? updated : e))
       setSelectedId(null)  // leave collection unselected after drop (avoids accidental eject)
@@ -667,7 +669,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
     if (!movers.length) return
     const items = getCollectionItems(col.content)
     const newItems = movers.map(m => ({ id: uid(), type: m.type, content: m.content, w: m.w, h: m.h }))
-    const updated = { ...col, content: { items: [...items, ...newItems] } }
+    const updated = { ...col, content: { ...col.content, items: [...items, ...newItems] } }
     const moverIds = new Set(movers.map(m => m.id))
     setElements(prev => prev.filter(e => !moverIds.has(e.id)).map(e => e.id === colId ? updated : e))
     setSelectedId(null)  // leave collection unselected after drop (avoids accidental eject)
@@ -786,7 +788,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
     if (type === 'image') setPreviewEl(el)
     else if (type === 'collection') setGalleryEl(el)   // double-tap opens like a folder
     else if (type === 'link') openUrl(el.content?.url?.trim())
-    else if (['idea', 'text', 'note', 'todo'].includes(type)) setEditingId(el.id)
+    else if (['idea', 'text', 'note', 'todo', 'palette'].includes(type)) setEditingId(el.id)
   }
 
   async function handleNavAction(type) {
@@ -819,7 +821,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
 
   async function handleFiles(files) {
     const imgs = Array.from(files).filter(f => f.type.startsWith('image/'))
-    const docs = Array.from(files).filter(f => f.type === 'application/pdf' || f.name.match(/\.(pdf|doc|docx)$/i))
+    const docs = Array.from(files).filter(f => f.type === 'application/pdf' || f.name.match(/\.pdf$/i))
     console.log('[placement] handleFiles imgs=' + imgs.length + ' docs=' + docs.length)
     const vp = getViewport()
 
@@ -1117,6 +1119,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
               onMakeCollection={() => makeCollection(el)}
               onEjectItem={itemId => ejectFromCollection(el.id, itemId)}
               onOpen={() => setGalleryEl(el)}
+              onOpenDoc={() => setDocPreviewEl(el)}
               isDropTarget={dropOverCollectionId === el.id}
               scaleRef={scaleRef}
             />
@@ -1181,7 +1184,7 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
 
       <input ref={fileRef} type="file" accept="image/*" multiple style={{ display: 'none' }}
         onChange={async e => { const files = await stableFiles(Array.from(e.target.files)); e.target.value = ''; handleFiles(files) }} />
-      <input ref={docRef} type="file" accept=".pdf,.doc,.docx" multiple style={{ display: 'none' }}
+      <input ref={docRef} type="file" accept=".pdf" multiple style={{ display: 'none' }}
         onChange={async e => { const files = await stableFiles(Array.from(e.target.files)); e.target.value = ''; handleFiles(files) }} />
       <input ref={importRef} type="file" accept=".json" style={{ display: 'none' }} onChange={handleImport} />
 
@@ -1254,6 +1257,10 @@ export default function BoardScreen({ boardId, boardStack, onOpenBoard, onBack, 
       {/* Collection Gallery modal */}
       {galleryEl && (
         <CollectionGallery el={galleryEl} onClose={() => setGalleryEl(null)} />
+      )}
+
+      {docPreviewEl && (
+        <DocumentPreview el={docPreviewEl} onClose={() => setDocPreviewEl(null)} />
       )}
     </div>
   )

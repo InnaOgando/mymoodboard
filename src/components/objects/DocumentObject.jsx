@@ -1,21 +1,12 @@
 import ResizeHandle from '../ResizeHandle'
 
-export default function DocumentObject({ el, selected, onResize, scaleRef }) {
+export default function DocumentObject({ el, selected, onResize, scaleRef, onOpenDoc }) {
   const w = el.w || 180
 
   function openDoc(e) {
     e.stopPropagation()
     if (!el.content.src) return
-    const byteStr = atob(el.content.src.split(',')[1])
-    const ab = new ArrayBuffer(byteStr.length)
-    const ia = new Uint8Array(ab)
-    for (let i = 0; i < byteStr.length; i++) ia[i] = byteStr.charCodeAt(i)
-    const blob = new Blob([ab], { type: el.content.type || 'application/octet-stream' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url; a.target = '_blank'; a.rel = 'noreferrer'
-    document.body.appendChild(a); a.click(); document.body.removeChild(a)
-    setTimeout(() => URL.revokeObjectURL(url), 10000)
+    onOpenDoc?.()
   }
 
   return (
